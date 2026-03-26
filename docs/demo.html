@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logistics Status Rule Engine v1.0.0</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; line-height: 1.6; }
+
+    /* ── Header ── */
+    .header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%); color: white; padding: 22px 40px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(0,0,0,0.35); }
+    .header-left h1 { font-size: 21px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-left p  { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+    .version-badge  { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.4px; }
+
+    /* ── Tabs ── */
+    .tabs-nav { background: white; border-bottom: 2px solid #e2e8f0; padding: 0 40px; display: flex; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .tab-btn { padding: 16px 26px; font-size: 14px; font-weight: 600; color: #64748b; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+    .tab-btn:hover  { color: #4f46e5; }
+    .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+    /* ── Content ── */
+    .tab-content { display: none; padding: 32px 40px; max-width: 1300px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    /* ── Cards ── */
+    .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04); margin-bottom: 24px; }
+    .card-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .section-title { font-size: 20px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+    .section-sub { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr;     gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+
+    /* ── Stat cards ── */
+    .stat { text-align: center; padding: 22px 16px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+    .stat-val { font-size: 30px; font-weight: 800; color: #4f46e5; }
+    .stat-lbl { font-size: 12px; color: #64748b; font-weight: 600; margin-top: 4px; }
+
+    /* ── Status badges ── */
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .b-booking  { background:#dbeafe; color:#1d4ed8; }
+    .b-hub      { background:#fef3c7; color:#92400e; }
+    .b-delivery { background:#d1fae5; color:#065f46; }
+    .b-3pl      { background:#ede9fe; color:#5b21b6; }
+    .b-terminal { background:#fee2e2; color:#991b1b; }
+    .b-override { background:#ffedd5; color:#9a3412; }
+    .b-except   { background:#e0e7ff; color:#3730a3; }
+
+    /* ── Pipeline ── */
+    .pipeline { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 8px 0 16px; }
+    .p-stage { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; min-width: 150px; }
+    .p-stage-hdr { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px; text-align: center; padding: 0 4px; }
+    .p-statuses { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+    .p-status { padding: 5px 12px; border-radius: 7px; font-size: 11px; font-weight: 600; text-align: center; cursor: pointer; transition: transform 0.18s, box-shadow 0.18s, opacity 0.18s, filter 0.18s; white-space: nowrap; border: 2px solid transparent; }
+    .p-status:hover  { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .p-status.sel      { border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.25); transform: translateY(-2px); }
+    .p-status.reachable{ border-color: #10b981 !important; box-shadow: 0 0 0 3px rgba(16,185,129,0.3), 0 4px 14px rgba(16,185,129,0.2); transform: translateY(-2px) scale(1.05); position: relative; z-index: 1; }
+    .p-status.dim      { opacity: 0.2; filter: blur(0.4px); transform: scale(0.96); pointer-events: none; }
+    .p-status.booking  { background:#dbeafe; color:#1d4ed8; }
+    .p-status.hub      { background:#fef3c7; color:#92400e; }
+    .p-status.delivery { background:#d1fae5; color:#065f46; }
+    .p-status.tpl      { background:#ede9fe; color:#5b21b6; }
+    .p-status.terminal { background:#fee2e2; color:#991b1b; }
+    .p-status.override { background:#ffedd5; color:#9a3412; font-style: italic; }
+    .p-status.except   { background:#e0e7ff; color:#3730a3; }
+    .p-arrow { display: flex; align-items: center; padding: 0 6px; color: #cbd5e1; font-size: 18px; flex: 0 0 auto; margin-top: 38px; }
+
+    /* ── Legend ── */
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+    /* ── Validator ── */
+    .validator-grid { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 16px; align-items: end; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group select, .form-group input { padding: 10px 14px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #1e293b; outline: none; transition: border-color 0.2s; }
+    .form-group select:focus, .form-group input:focus { border-color: #4f46e5; }
+    .flow-toggle { display: flex; gap: 0; border: 2px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .flow-btn { padding: 9px 16px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; background: white; color: #64748b; transition: all 0.2s; }
+    .flow-btn.active { background: #4f46e5; color: white; }
+    .validate-btn { padding: 10px 24px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; height: 44px; white-space: nowrap; transition: background 0.2s; }
+    .validate-btn:hover { background: #4338ca; }
+
+    .result-box { margin-top: 20px; padding: 20px 24px; border-radius: 10px; display: none; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+    .result-valid   { background: #f0fdf4; border: 2px solid #16a34a; }
+    .result-invalid { background: #fef2f2; border: 2px solid #dc2626; }
+    .result-title   { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
+    .result-valid   .result-title { color: #16a34a; }
+    .result-invalid .result-title { color: #dc2626; }
+    .result-rows { display: flex; flex-direction: column; gap: 5px; }
+    .result-row  { display: flex; gap: 10px; font-size: 13px; }
+    .result-key  { font-weight: 700; color: #475569; min-width: 140px; }
+    .result-val  { color: #1e293b; }
+
+    /* ── Concept boxes ── */
+    .concept { border-left: 4px solid #4f46e5; padding: 12px 16px; background: #f8f7ff; border-radius: 0 8px 8px 0; margin-bottom: 12px; }
+    .concept.amber { border-left-color: #f59e0b; background: #fffbeb; }
+    .concept.green { border-left-color: #10b981; background: #f0fdf4; }
+    .concept.red   { border-left-color: #ef4444; background: #fef2f2; }
+    .concept-ttl  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+    .concept-body { font-size: 13px; color: #475569; }
+
+    /* ── Architecture table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f8fafc; padding: 11px 14px; text-align: left; font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    tr.hl td { background: #f0fdf4; font-weight: 600; }
+    .chk { color: #16a34a; }
+    .crs { color: #dc2626; }
+
+    /* ── Mermaid wrapper ── */
+    .mermaid-wrap { background: #f8fafc; border-radius: 10px; padding: 20px; overflow-x: auto; text-align: center; margin-bottom: 8px; min-height: 80px; }
+    .diagram-cap { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 16px; }
+
+    /* ── Code block ── */
+    pre.codeblock { background: #0f172a; color: #cbd5e1; padding: 20px; border-radius: 10px; font-size: 12px; overflow-x: auto; line-height: 1.8; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+    .kw  { color: #93c5fd; }
+    .fn  { color: #6ee7b7; }
+    .str { color: #fca5a5; }
+    .cm  { color: #475569; }
+    .tp  { color: #c4b5fd; }
+    .num { color: #fbbf24; }
+
+    /* ── Error table ── */
+    .errcode { font-family: monospace; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+
+    /* ── Seq diagram labels ── */
+    .seq-label { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; margin-top: 16px; }
+
+    @media (max-width: 900px) {
+      .tabs-nav { padding: 0 16px; overflow-x: auto; }
+      .tab-content { padding: 20px 16px; }
+      .grid-2, .grid-3, .grid-4, .validator-grid { grid-template-columns: 1fr; }
+      .header { padding: 16px 20px; flex-direction: column; gap: 10px; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<div class="header">
+  <div class="header-left">
+    <h1>📦 Logistics Status Rule Engine</h1>
+    <p>Shipment status transition validation · Embedded in-process library · Zero network calls</p>
+  </div>
+  <span class="version-badge">spec v1.0.0</span>
+</div>
+
+<!-- ════════════════════ TAB NAV ════════════════════ -->
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="tab-ops"   onclick="switchTab('tab-ops')">   🎯 Operations</button>
+  <button class="tab-btn"        data-tab="tab-arch"  onclick="switchTab('tab-arch')">  🏗 Architecture</button>
+  <button class="tab-btn"        data-tab="tab-lld"   onclick="switchTab('tab-lld')">   🔬 Low-Level Design</button>
+  <button class="tab-btn"        data-tab="tab-ci"    onclick="switchTab('tab-ci')">    🧪 CI Pipeline</button>
+  <button class="tab-btn"        data-tab="tab-cd"    onclick="switchTab('tab-cd')">    🚀 CD Pipeline</button>
+  <button class="tab-btn"        data-tab="tab-statuses" onclick="switchTab('tab-statuses')">📦 Status Registry</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 1 — OPERATIONS (business stakeholders)
+═══════════════════════════════════════════════════ -->
+<div id="tab-ops" class="tab-content active">
+
+  <!-- Hero -->
+  <div class="card" style="background: linear-gradient(135deg,#eef2ff,#f0fdf4); border: 1px solid #e0e7ff;">
+    <p style="font-size:15px; color:#1e293b; line-height:1.8; max-width:860px;">
+      <strong>What does this system do?</strong><br>
+      Every shipment at Logistics passes through a sequence of statuses — from
+      <span class="badge b-booking">DRAFT</span> at booking, through
+      <span class="badge b-hub">HUB-IN-SCANNED</span> and <span class="badge b-hub">HUB-OUTSCAN</span>
+      in the middle mile, to <span class="badge b-delivery">DELIVERED</span> or
+      <span class="badge b-terminal">RTO_DELIVERED</span> at the end.
+      This library acts as the <strong>single enforcement point</strong> for every status change —
+      if a system tries to move a shipment from an invalid state, the engine blocks it in
+      <strong>under 1 millisecond</strong>, with no database call and no network hop.
+      It is embedded inside every source system (Booking, Hub Ops, Delivery, 3PL)
+      so rules are enforced even if the central platform is unavailable.
+    </p>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="stat"><div class="stat-val">50L+</div><div class="stat-lbl">Events / Day</div></div>
+    <div class="stat"><div class="stat-val">&lt;1ms</div><div class="stat-lbl">Validation Latency</div></div>
+    <div class="stat"><div class="stat-val">55</div><div class="stat-lbl">Status Codes</div></div>
+    <div class="stat"><div class="stat-val">0</div><div class="stat-lbl">Network Calls on Hot Path</div></div>
+  </div>
+
+  <!-- Interactive Validator -->
+  <div class="card">
+    <div class="card-title"><span class="icon">✅</span> Live Transition Validator — try any status change</div>
+
+    <div class="validator-grid">
+      <div class="form-group">
+        <label>Current Status</label>
+        <select id="v-from">
+          <option value="">— select —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Next Status</label>
+        <select id="v-to">
+          <option value="">— select —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Flow</label>
+        <div class="flow-toggle">
+          <button class="flow-btn active" id="btn-forward" onclick="setFlow('FORWARD')">Forward</button>
+          <button class="flow-btn"        id="btn-reverse" onclick="setFlow('REVERSE')">Reverse</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Operator ID <span style="font-weight:400;font-size:11px;">(FORCE_* only)</span></label>
+        <input type="text" id="v-opid" placeholder="e.g. OPS-7842">
+      </div>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <button class="validate-btn" onclick="runValidate()">Validate Transition →</button>
+      <span style="font-size:12px; color:#94a3b8;">Source System is inferred from the next status owner</span>
+    </div>
+
+    <div class="result-box" id="result-box">
+      <div class="result-title" id="result-title"></div>
+      <div class="result-rows" id="result-rows"></div>
+    </div>
+  </div>
+
+  <!-- Key Concepts -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="icon">⚡</span> FORCE_* Overrides</div>
+      <div class="concept amber">
+        <div class="concept-ttl">What is it?</div>
+        <div class="concept-body">Sometimes a Hub operator needs to manually push a shipment past a stuck status — for example, forcing an outscan when the system state is inconsistent. FORCE_* statuses exist for exactly this.</div>
+      </div>
+      <div class="concept">
+        <div class="concept-ttl">How is it controlled?</div>
+        <div class="concept-body">Every FORCE_* transition <strong>requires an Operator ID</strong>. The engine rejects it without one. It is logged to the audit trail automatically. This keeps overrides accountable, not invisible.</div>
+      </div>
+      <div class="concept red">
+        <div class="concept-ttl">What it is NOT</div>
+        <div class="concept-body">FORCE_* is <strong>not a bypass</strong> of the rule engine. It is a pre-approved, explicitly modelled edge in the spec — validated like every other transition. You cannot FORCE a transition the spec doesn't define.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">⚠️</span> Exception Wildcards</div>
+      <div class="concept">
+        <div class="concept-ttl">What are they?</div>
+        <div class="concept-body">Seven exception statuses — DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, MODE_AUDITED — can be set from <strong>any</strong> non-terminal status, in any flow. They model real operational disruptions that can happen at any point in the journey.</div>
+      </div>
+      <div class="concept green">
+        <div class="concept-ttl">Why wildcards, not explicit edges?</div>
+        <div class="concept-body">Listing these 7 statuses as valid destinations from all ~48 non-terminal statuses would produce 336 explicit edges. Instead, they're declared once as wildcards and expanded automatically when the adjacency map is compiled at startup.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 2 — ARCHITECTURE
+═══════════════════════════════════════════════════ -->
+<div id="tab-arch" class="tab-content">
+
+  <div class="section-title">System Architecture</div>
+  <div class="section-sub">How the rule engine fits into the Logistics platform</div>
+
+  <!-- Why embedded -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🧠</span> Why an Embedded Library, Not a Central Service</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>Centralized Service</th>
+          <th>Sidecar Process</th>
+          <th class="hl">Embedded Library ← chosen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Validation latency</td>
+          <td><span class="crs">✗</span> 1–200ms + tail</td>
+          <td>~0.5ms IPC</td>
+          <td class="hl"><span class="chk">✓</span> &lt;0.1ms (L1 cache read)</td>
+        </tr>
+        <tr>
+          <td>Availability risk</td>
+          <td><span class="crs">✗</span> Outage blocks all sources</td>
+          <td>Moderate</td>
+          <td class="hl"><span class="chk">✓</span> None — no external dependency</td>
+        </tr>
+        <tr>
+          <td>Source of truth</td>
+          <td><span class="chk">✓</span> Yes (runtime)</td>
+          <td>Harder to sync</td>
+          <td class="hl"><span class="chk">✓</span> Yes (versioned spec at build time)</td>
+        </tr>
+        <tr>
+          <td>Spec correctness</td>
+          <td>Runtime crash on bad spec</td>
+          <td>Runtime crash</td>
+          <td class="hl"><span class="chk">✓</span> Invalid spec = build failure</td>
+        </tr>
+        <tr>
+          <td>Rule update cost</td>
+          <td><span class="chk">✓</span> Deploy service only</td>
+          <td>Config push + restart</td>
+          <td>Library release + redeploy all 4 systems</td>
+        </tr>
+        <tr>
+          <td>Heap allocations on hot path</td>
+          <td>Many (HTTP, JSON parse)</td>
+          <td>IPC serialization</td>
+          <td class="hl"><span class="chk">✓</span> Zero — enforced by CI</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px; color:#64748b; margin-top:12px;">Rule update overhead is acceptable: The rule engine's status rules change a few times per quarter. Safety guarantee (invalid spec = build failure) outweighs operational convenience.</p>
+  </div>
+
+  <!-- System Topology Diagram -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🗂</span> System Topology</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart TB
+    YAML["📄 rules.yaml v1.0.0\nSingle Source of Truth\nlogistics-oss/status-rule-spec"]
+
+    subgraph BOOKING["Booking System — Java / Spring Boot"]
+      BE["Rule Engine\n(embedded)"]
+    end
+    subgraph HUB["Hub Ops System — Go / gRPC"]
+      HE["Rule Engine\n(embedded)"]
+    end
+    subgraph DELIVERY["Delivery System — Kotlin + Android"]
+      DE["Rule Engine\n(embedded)"]
+    end
+    subgraph PL["3PL Adapters — Python / JavaScript"]
+      TE["Rule Engine\n(embedded)"]
+    end
+
+    YAML -.->|"bundled at build time\n(go:embed / JAR resource)"| BE
+    YAML -.->|"bundled at build time"| HE
+    YAML -.->|"bundled at build time"| DE
+    YAML -.->|"bundled at build time"| TE
+
+    BOOKING -->|"emit events"| EB["📨 Event Bus\n(Kafka)"]
+    HUB     -->|"emit events"| EB
+    DELIVERY-->|"emit events"| EB
+    PL      -->|"emit events"| EB
+    EB --> TAD["🔍 Tracking Anomaly\nDetector\n(cross-system validator)"]
+      </pre>
+    </div>
+    <p class="diagram-cap">Each source system embeds its own engine instance. No shared process. No network call on the validation hot path.</p>
+  </div>
+
+  <!-- Engine Internals -->
+  <div class="card">
+    <div class="card-title"><span class="icon">⚙️</span> Engine Internals — Validate() Hot Path</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart LR
+    IN["Validate(\n  current,\n  next,\n  flow,\n  ctx\n)"]
+
+    Z["Zero-value guard\ncurrent==0 or next==0\nErrZeroValueStatus"]
+    U["Unknown status guard\nID out of range\nErrUnknownStatus"]
+    F["Flow guard\nForward or Reverse only\nErrFlowMismatch"]
+    T["Terminal guard\ncurrent is terminal?\nErrTerminalStatus"]
+    L["Adjacency Map Lookup\nadj[from<<7 | to<<1 | flowBit]\n8192 × uint16 = 16 KB\nL1 cache hit"]
+    P["Edge present?\nflagPresent bit set?"]
+    O["Operator ID check\nflagRequiresOpID?\nErrMissingOperatorID"]
+    IS["Inter-system check\nowners[next] == ctx.SourceSystem?\nErrInvalidSourceSystem"]
+    R["ValidationResult\n{Valid, IsOverride, Mode}\nreturned by value\n0 allocs"]
+
+    IN --> Z --> U --> F --> T --> L --> P
+    P -->|"miss (0)"| ERR["✗ ErrInvalidTransition"]
+    P -->|"hit"| O --> IS --> R
+      </pre>
+    </div>
+    <p class="diagram-cap">Every guard is a single integer comparison. The adjacency map lookup is one array read. Total: ~13ns on M3 / ~21ns on server hardware.</p>
+  </div>
+
+  <!-- Adjacency Map Internals -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🗃</span> Adjacency Map — Key Packing</div>
+    <div class="grid-2">
+      <div>
+        <p style="font-size:13px; color:#475569; margin-bottom:16px;">
+          All 55 statuses have stable integer IDs (1–55). The triplet
+          <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">(from, to, flow)</code>
+          is packed into a single <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">uint16</code>
+          array index.
+        </p>
+        <pre class="codeblock"><span class="cm">// Pack key: from_id &lt;&lt; 7 | to_id &lt;&lt; 1 | flow_bit</span>
+<span class="cm">// flow_bit: Forward=0, Reverse=1</span>
+
+<span class="cm">// Max key: 55&lt;&lt;7 | 55&lt;&lt;1 | 1 = 7151</span>
+<span class="cm">// Array size: [8192] (next power of 2)</span>
+<span class="cm">// Memory: 8192 × 2 bytes = 16 KB — fits in L1 cache</span>
+
+<span class="tp">type</span> adjacencyMap [<span class="num">8192</span>]<span class="tp">uint16</span>
+
+<span class="cm">// Edge flags in each uint16 slot:</span>
+<span class="cm">//   bit 0 — flagPresent      (transition exists)</span>
+<span class="cm">//   bit 1 — flagOverride     (FORCE_* edge)</span>
+<span class="cm">//   bit 2 — flagRequiresOpID (needs operator_id)</span>
+<span class="cm">//   bit 3 — flagInterSystem  (crosses ownership boundary)</span>
+
+<span class="cm">// Zero value = no transition. Non-zero = valid.</span>
+<span class="cm">// Single read: adj[packKey(from, to, flow)]</span></pre>
+      </div>
+      <div>
+        <div class="concept">
+          <div class="concept-ttl">Why a fixed array, not a hash map?</div>
+          <div class="concept-body">A Go <code>map</code> costs ~50–100ns per lookup (hashing + bucket scan + pointer chasing). A fixed array costs one memory load instruction. At 50 lakh events/day, the difference is material.</div>
+        </div>
+        <div class="concept green">
+          <div class="concept-ttl">Why 16 KB matters</div>
+          <div class="concept-body">L1 cache on any modern server CPU is 32–64 KB per core. The 16 KB array fits entirely in L1. After the first ~10 calls (warmup), every lookup is served from L1 — effectively a register-speed operation.</div>
+        </div>
+        <div class="concept amber">
+          <div class="concept-ttl">Zero-allocation guarantee</div>
+          <div class="concept-body">The success path returns a struct by value. AnomalyReason strings on the failure path are compile-time constants (data segment). No heap escapes. Enforced by <code>testing.AllocsPerRun</code> in CI.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Polyglot Strategy -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🌐</span> Polyglot Distribution — One Spec, Four Languages</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart LR
+    SPEC["📄 spec/rules.yaml\nSingle source of truth\nread at runtime by all packages"]
+
+    SPEC -->|"../spec/rules.yaml"| GO["go/\ngithub.com/logistics-oss/status-rules\nGo module"]
+    SPEC -->|"../spec/rules.yaml"| JAR["java/\nio.logistics:status-rules\nMaven JAR"]
+    SPEC -->|"../../spec/rules.yaml"| NPM["node/\n@logistics-oss/status-rules\nnpm package"]
+    SPEC -->|"../../../spec/rules.yaml"| PY["python/\nlogistics-status-rules\nPyPI package"]
+
+    GO  --> CI["✅ All tests passing\ngo test ./...\nmvn test\nnpm test\npytest tests/ -v"]
+    JAR --> CI
+    NPM --> CI
+    PY  --> CI
+      </pre>
+    </div>
+    <p class="diagram-cap">Edit <code>spec/rules.yaml</code> once — all four packages see the change immediately. No codegen step.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 3 — LOW-LEVEL DESIGN
+═══════════════════════════════════════════════════ -->
+<div id="tab-lld" class="tab-content">
+
+  <div class="section-title">Low-Level Design</div>
+  <div class="section-sub">How Booking, Hub Ops, and Delivery integrate with the library — sequence flows and API reference</div>
+
+  <!-- Public API -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📐</span> Public API Surface</div>
+    <pre class="codeblock"><span class="cm">// ── Engine initialization (called once at startup) ──────────────────────────</span>
+<span class="kw">func</span> <span class="fn">NewEngine</span>() *<span class="tp">Engine</span>                                    <span class="cm">// panics if bundled spec is invalid (build-time invariant)</span>
+<span class="kw">func</span> <span class="fn">NewEngineFromSpec</span>(specYAML []<span class="tp">byte</span>) (*<span class="tp">Engine</span>, <span class="tp">error</span>)      <span class="cm">// for tests and canary validation only</span>
+
+<span class="cm">// ── Hot path ────────────────────────────────────────────────────────────────</span>
+<span class="kw">func</span> (e *<span class="tp">Engine</span>) <span class="fn">Validate</span>(
+    current <span class="tp">status.Status</span>,       <span class="cm">// last confirmed status (caller's responsibility)</span>
+    next    <span class="tp">status.Status</span>,       <span class="cm">// status the system wants to emit</span>
+    flow    <span class="tp">Flow</span>,               <span class="cm">// FlowForward or FlowReverse</span>
+    ctx     <span class="tp">TransitionContext</span>,   <span class="cm">// {AWB, SourceSystem, OperatorID}</span>
+) <span class="tp">ValidationResult</span>               <span class="cm">// returned by value · 0 allocs on success path</span>
+
+<span class="kw">func</span> (e *<span class="tp">Engine</span>) <span class="fn">ValidateInitial</span>(
+    first <span class="tp">status.Status</span>,         <span class="cm">// valid first status for a new shipment</span>
+    flow  <span class="tp">Flow</span>,
+    ctx   <span class="tp">TransitionContext</span>,
+) <span class="tp">ValidationResult</span>               <span class="cm">// used by Booking on shipment creation (no prior status)</span>
+
+<span class="cm">// ── Not on hot path ─────────────────────────────────────────────────────────</span>
+<span class="kw">func</span> (e *<span class="tp">Engine</span>) <span class="fn">PermittedTransitions</span>(current <span class="tp">status.Status</span>, flow <span class="tp">Flow</span>) []<span class="tp">status.Status</span>
+<span class="kw">func</span> (e *<span class="tp">Engine</span>) <span class="fn">SpecVersion</span>() <span class="tp">string</span>
+<span class="kw">func</span> (e *<span class="tp">Engine</span>) <span class="fn">Snapshot</span>() <span class="tp">MetricsSnapshot</span>   <span class="cm">// call every 15s from metrics goroutine</span></pre>
+  </div>
+
+  <!-- Sequence diagrams -->
+  <div class="grid-2">
+
+    <!-- Booking: new shipment -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🏢</span> Booking System — New Shipment Creation</div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant BS as Booking System
+    participant RE as Rule Engine
+    participant EB as Event Bus
+
+    Note over BS: AWB100001 — new shipment
+    BS->>RE: ValidateInitial(DRAFT, FORWARD, {SystemBooking})
+    RE-->>BS: Valid=true Mode=IntraSystem
+    BS->>EB: emit DRAFT
+
+    BS->>RE: Validate(DRAFT, BOOKED, FORWARD, {SystemBooking})
+    RE-->>BS: Valid=true Mode=IntraSystem
+    BS->>EB: emit BOOKED
+
+    BS->>RE: Validate(BOOKED, MANIFESTED, FORWARD, {SystemBooking})
+    RE-->>BS: Valid=true Mode=IntraSystem
+    BS->>EB: emit MANIFESTED
+        </pre>
+      </div>
+      <p class="diagram-cap">ValidateInitial is used on creation. Validate() for every subsequent move.</p>
+    </div>
+
+    <!-- Hub: intra-system scan -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📦</span> Hub Ops — Intra-System Scan (Normal Path)</div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant OP as Scanner
+    participant HS as Hub System
+    participant RE as Rule Engine
+    participant DB as Hub DB
+    participant EB as Event Bus
+
+    OP->>HS: scan AWB100001
+    HS->>DB: get current status
+    DB-->>HS: HUB-IN-SCANNED
+
+    HS->>RE: Validate(HUB-IN-SCANNED, HUB-OUTSCAN, FORWARD, {SystemHub})
+    RE-->>HS: Valid=true IsOverride=false Mode=IntraSystem
+
+    HS->>DB: update status = HUB-OUTSCAN
+    HS->>EB: emit HUB-OUTSCAN
+        </pre>
+      </div>
+      <p class="diagram-cap">Both HUB-IN-SCANNED and HUB-OUTSCAN are owned by SystemHub — full intra-system enforcement.</p>
+    </div>
+
+    <!-- Inter-system handoff -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🤝</span> Hub Ops — Inter-System Handoff (Booking → Hub)</div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant BS as Booking System
+    participant EB as Event Bus
+    participant HS as Hub System
+    participant RE as Rule Engine
+    participant TAD as Tracking Anomaly Detector
+
+    BS->>EB: emit MANIFESTED
+    Note over HS: Physical pickup confirmed
+    HS->>RE: Validate(MANIFESTED, READY_FOR_PICKUP, FORWARD, {SystemHub})
+    RE-->>HS: Valid=true Mode=InterSystem
+
+    Note over HS: Mode=InterSystem logged for ops correlation
+    HS->>EB: emit READY_FOR_PICKUP
+
+    EB->>TAD: event received
+    Note over TAD: Authoritative cross-system<br/>validator — checks actual<br/>prior state on timeline
+        </pre>
+      </div>
+      <p class="diagram-cap">MANIFESTED is owned by Booking; READY_FOR_PICKUP by Hub. Library validates structure + ownership. Tracking Anomaly Detector validates runtime state.</p>
+    </div>
+
+    <!-- FORCE_* override -->
+    <div class="card">
+      <div class="card-title"><span class="icon">⚡</span> Hub Ops — FORCE_* Override with Audit Trail</div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant OP as Hub Operator
+    participant HS as Hub System
+    participant RE as Rule Engine
+    participant AL as Audit Log
+    participant EB as Event Bus
+
+    OP->>HS: Force outscan — operatorId: OPS-7842
+    HS->>RE: Validate(HUB-IN-SCANNED, FORCE_HUB_OUTSCAN, FORWARD, {SystemHub, OPS-7842})
+    RE-->>HS: Valid=true IsOverride=true Mode=IntraSystem
+
+    Note over HS: IsOverride=true — mandatory audit
+    HS->>AL: RecordOverride(AWB, FORCE_HUB_OUTSCAN, OPS-7842)
+    HS->>EB: emit FORCE_HUB_OUTSCAN
+
+    Note over HS: Rejected without OperatorID
+    HS->>RE: Validate(same, OperatorID= )
+    RE-->>HS: Valid=false ErrMissingOperatorID
+        </pre>
+      </div>
+      <p class="diagram-cap">The engine both validates the FORCE_* edge AND enforces operator_id presence. No audit-free overrides.</p>
+    </div>
+
+  </div>
+
+  <!-- Delivery offline mode -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📵</span> Delivery System — Offline Mode Exception</div>
+    <div class="grid-2">
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant AG as Delivery Agent (offline)
+    participant APP as Delivery App (local)
+    participant RE as Rule Engine
+    participant SRV as Delivery Server
+    participant TAD as Tracking Anomaly Detector
+
+    Note over AG,APP: No network connectivity
+    AG->>APP: mark ATTEMPTED
+
+    APP->>RE: Validate(OUT_FOR_DELIVERY, ATTEMPTED, FORWARD, {SystemDelivery})
+    RE-->>APP: Valid=true
+
+    Note over APP: Store locally
+
+    Note over AG,APP: Connectivity restored
+    APP->>SRV: sync events
+
+    SRV->>TAD: push events for anomaly check
+    Note over TAD: Detects if actual<br/>prior state conflicts<br/>with app assumption
+        </pre>
+      </div>
+      <div>
+        <div class="concept amber">
+          <div class="concept-ttl">Why offline is different</div>
+          <div class="concept-body">The delivery agent may be in a basement with no signal. Blocking status updates would freeze the entire last-mile operation. The app accepts the validated transition locally and syncs when online.</div>
+        </div>
+        <div class="concept red">
+          <div class="concept-ttl">What can go wrong</div>
+          <div class="concept-body">The agent's app holds a stale copy of the shipment's current status. If another system moved the shipment while offline, the app's assumed prior state is wrong. This is why the tracking anomaly detector exists — it cross-checks on sync.</div>
+        </div>
+        <div class="concept green">
+          <div class="concept-ttl">Rule engine still runs</div>
+          <div class="concept-body">Even offline, the embedded engine validates the transition locally. The agent cannot emit a structurally invalid transition — only potentially a state-inconsistent one, which the TAD catches on sync.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ValidationResult + ErrorCode reference -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span> ValidationResult Fields</div>
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>Valid</code></td><td>bool</td><td>Transition is allowed</td></tr>
+          <tr><td><code>IsOverride</code></td><td>bool</td><td>FORCE_* edge — caller must audit-log</td></tr>
+          <tr><td><code>Mode</code></td><td>ValidationMode</td><td>1=IntraSystem, 2=InterSystem</td></tr>
+          <tr><td><code>ErrorCode</code></td><td>ErrorCode</td><td>Typed failure reason (see table)</td></tr>
+          <tr><td><code>AnomalyReason</code></td><td>string</td><td>Human-readable; non-empty only on failure. String literal — no heap alloc.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🚦</span> ErrorCode Reference</div>
+      <table>
+        <thead><tr><th>Code</th><th>Value</th><th>Cause</th></tr></thead>
+        <tbody>
+          <tr><td><span class="errcode">ErrNone</span></td><td>0</td><td>Success — no error</td></tr>
+          <tr><td><span class="errcode">ErrInvalidTransition</span></td><td>1</td><td>Edge not defined in spec</td></tr>
+          <tr><td><span class="errcode">ErrTerminalStatus</span></td><td>2</td><td>currentStatus is a terminal node</td></tr>
+          <tr><td><span class="errcode">ErrUnknownStatus</span></td><td>3</td><td>Status ID out of [1,55] range</td></tr>
+          <tr><td><span class="errcode">ErrMissingOperatorID</span></td><td>4</td><td>FORCE_* without OperatorID</td></tr>
+          <tr><td><span class="errcode">ErrFlowMismatch</span></td><td>5</td><td>Flow is not Forward or Reverse</td></tr>
+          <tr><td><span class="errcode">ErrInvalidSourceSystem</span></td><td>6</td><td>Emitting system doesn't own next status</td></tr>
+          <tr><td><span class="errcode">ErrZeroValueStatus</span></td><td>7</td><td>Uninitialized Status (use ValidateInitial)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Source system handling table -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🏭</span> What Each Source System Does on an Invalid Result</div>
+    <table>
+      <thead>
+        <tr><th>Source System</th><th>On Invalid Transition</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-booking">Booking System</span></td>
+          <td>Block action, return error to caller</td>
+          <td>Synchronous, transactional — user can correct</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-hub">Hub System</span></td>
+          <td>Block scan, surface error on scanner UI</td>
+          <td>Operator-driven; error is actionable in real time</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-delivery">Delivery (online)</span></td>
+          <td>Block action, surface error in agent app</td>
+          <td>Agent can radio in for manual override</td>
+        </tr>
+        <tr style="background:#fffbeb;">
+          <td><span class="badge b-delivery">Delivery (offline)</span></td>
+          <td><strong>Accept locally, flag for review on sync</strong></td>
+          <td>Cannot reject — agent may be unreachable. Tracking anomaly detector compensates.</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-3pl">3PL Adapter</span></td>
+          <td>Reject with 422, log partner-specific error</td>
+          <td>Partner has time to resend; do not buffer invalid partner events</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 4 — CI PIPELINE
+═══════════════════════════════════════════════════ -->
+<div id="tab-ci" class="tab-content">
+
+  <div class="section-title">CI Pipeline</div>
+  <div class="section-sub">Every pull request to the rule engine library or spec repository runs this pipeline. A failure at any stage blocks merge.</div>
+
+  <!-- Stage overview -->
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="stat"><div class="stat-val">7</div><div class="stat-lbl">Pipeline Stages</div></div>
+    <div class="stat"><div class="stat-val">&lt;90s</div><div class="stat-lbl">Total CI Run Time</div></div>
+    <div class="stat"><div class="stat-val">500+</div><div class="stat-lbl">Parity Test Cases</div></div>
+    <div class="stat"><div class="stat-val">0</div><div class="stat-lbl">Allocs Allowed on Hot Path</div></div>
+  </div>
+
+  <!-- Full pipeline flow -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🔄</span> Full CI Flow — Pull Request to Merge</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart TD
+    PR["🔀 Pull Request opened\nto status-rule-engine or\nlogistics-oss/status-rule-spec"]
+
+    S1["Stage 1 — Spec Validation\nJSON Schema lint on rules.yaml\nChecks: duplicate IDs, unknown owned_by,\ntransition from terminal, missing fields\n~2s"]
+
+    S2["Stage 2 — Build\ngo build ./...\nInvalid bundled spec = compile panic\nTypos in status constants = compile error\n~5s"]
+
+    S3["Stage 3 — Contract Tests\nPositive: every spec edge returns Valid=true\nNegative: every invalid edge returns Valid=false\nGenerated from spec YAML automatically\n~10s"]
+
+    S4["Stage 4 — Property Tests\nTerminal statuses never valid as source\nWildcards reachable from every non-terminal\nFORCE_* always returns IsOverride=true\nFORCE_* without OperatorID = ErrMissingOperatorID\n~8s"]
+
+    S5["Stage 5 — Zero-Alloc Gate\ntesting.AllocsPerRun on success path\ntesting.AllocsPerRun on failure path\ntesting.AllocsPerRun on FORCE_* path\nFail = blocked, no exceptions\n~5s"]
+
+    S6["Stage 6 — Benchmark Regression\ngo test -bench=. -benchmem -count=5\nValidate hot path must be under 100ns p99\nCompared against main branch baseline\n~30s"]
+
+    S7["Stage 7 — Cross-Language Parity\nRun 500+ shared JSON fixtures against\nGo · Java · JavaScript · Python impls\nAll must produce identical results\n~20s"]
+
+    MERGE["✅ All stages green\nPR approved for merge"]
+    FAIL["❌ Any stage fails\nPR blocked — author must fix"]
+
+    PR --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+    S7 -->|"all pass"| MERGE
+    S1 -->|"fail"| FAIL
+    S2 -->|"fail"| FAIL
+    S3 -->|"fail"| FAIL
+    S4 -->|"fail"| FAIL
+    S5 -->|"fail"| FAIL
+    S6 -->|"fail"| FAIL
+    S7 -->|"divergence"| FAIL
+      </pre>
+    </div>
+  </div>
+
+  <!-- Stage deep dives -->
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📄</span> Stage 1 — Spec Validation</div>
+      <div class="concept">
+        <div class="concept-ttl">What it checks</div>
+        <div class="concept-body">A JSON Schema validator runs against <code>rules.yaml</code> before any Go code is compiled. It catches: duplicate status IDs, unknown <code>owned_by</code> values, transitions referencing undefined status codes, wildcard targets marked as terminal, and missing required fields.</div>
+      </div>
+      <div class="concept red">
+        <div class="concept-ttl">Why this runs first</div>
+        <div class="concept-body">If the spec is structurally invalid, every subsequent stage will also fail — but with cryptic errors. The schema validator surfaces the exact problem (line, field, value) in 2 seconds, saving engineers from debugging a Go panic.</div>
+      </div>
+      <pre class="codeblock"><span class="cm"># spec-repo CI — runs on every PR</span>
+<span class="fn">validate-spec</span>:
+  <span class="kw">run</span>: <span class="str">ajv validate -s spec/schema.json -d spec/rules.yaml</span>
+  <span class="cm"># exits non-zero on any violation</span>
+  <span class="cm"># output: line number + field + error message</span></pre>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🏗</span> Stage 2 — Build Gate</div>
+      <div class="concept green">
+        <div class="concept-ttl">Invalid spec = build failure (not runtime crash)</div>
+        <div class="concept-body"><code>NewEngine()</code> calls <code>panic()</code> if the bundled spec fails to compile. This means any commit that bundles a broken spec will fail <code>go build</code> immediately — before a single test runs. Engineers see the error at build time, not in production.</div>
+      </div>
+      <div class="concept">
+        <div class="concept-ttl">Typos are compile errors</div>
+        <div class="concept-body">Generated status constants (<code>status.HubOutscan</code>, <code>status.Delivered</code>) mean that source systems referencing a renamed or deleted status will fail to compile. No stringly-typed status codes escape into the codebase.</div>
+      </div>
+      <pre class="codeblock"><span class="fn">build</span>:
+  <span class="kw">run</span>: <span class="str">go build ./...</span>
+  <span class="cm"># NewEngine() panics on bad bundled spec</span>
+  <span class="cm"># → go test -run=^$ ./... triggers init</span>
+  <span class="cm"># → caught before any test runs</span></pre>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span> Stage 3 — Contract Tests</div>
+      <p style="font-size:13px;color:#475569;margin-bottom:14px;">Generated from <code>spec/rules.yaml</code> at CI time. Every edge in the spec gets two tests automatically.</p>
+      <div class="mermaid-wrap" style="padding:12px;">
+        <pre class="mermaid">
+flowchart LR
+    YAML["rules.yaml"] --> GEN["codegen\ncontract-tests"]
+    GEN --> POS["Positive tests\nValidate each spec edge\n→ must return Valid=true"]
+    GEN --> NEG["Negative tests\nFor each from-status\ntest one invalid to-status\n→ must return Valid=false"]
+    POS --> RUN["go test -run TestContract\n~10s · pure in-memory"]
+    NEG --> RUN
+        </pre>
+      </div>
+      <div class="concept amber">
+        <div class="concept-ttl">Why generate, not hand-write</div>
+        <div class="concept-body">If a new transition is added to the spec but the contract test is forgotten, coverage silently drops. Generated tests ensure every spec edge is always tested — no manual maintenance.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🔬</span> Stage 4 — Property / Fuzz Tests</div>
+      <p style="font-size:13px;color:#475569;margin-bottom:14px;">Invariants that must hold regardless of which transitions are in the spec. Not derivable from any single edge.</p>
+      <table>
+        <thead><tr><th>Invariant</th><th>Test</th></tr></thead>
+        <tbody>
+          <tr><td>Terminal statuses never valid as <code>from</code></td><td><code>TestProperty_TerminalStatusNeverValidFrom</code></td></tr>
+          <tr><td>Wildcards reachable from all non-terminals</td><td><code>TestProperty_WildcardTargetsReachableFromAny</code></td></tr>
+          <tr><td>FORCE_* always returns <code>IsOverride=true</code></td><td><code>TestProperty_ForceEdgesReturnIsOverride</code></td></tr>
+          <tr><td>FORCE_* without OperatorID → <code>ErrMissingOperatorID</code></td><td><code>TestProperty_ForceEdgesRequireOperatorID</code></td></tr>
+          <tr><td>Zero-value status → <code>ErrZeroValueStatus</code></td><td><code>TestProperty_ZeroValueStatus</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">⚡</span> Stage 5 — Zero-Alloc Gate</div>
+      <div class="concept red">
+        <div class="concept-ttl">The most important CI gate</div>
+        <div class="concept-body">Any change that introduces a heap allocation on the <code>Validate()</code> hot path will silently degrade throughput at 50L events/day. This test makes that regression impossible to ship.</div>
+      </div>
+      <pre class="codeblock"><span class="kw">func</span> <span class="fn">TestValidate_NoAlloc_SuccessPath</span>(t *testing.T) {
+  e   := statusrules.<span class="fn">NewEngine</span>()
+  ctx := statusrules.<span class="tp">TransitionContext</span>{
+    SourceSystem: statusrules.<span class="tp">SystemHub</span>,
+  }
+  allocs := testing.<span class="fn">AllocsPerRun</span>(<span class="num">1000</span>, <span class="kw">func</span>() {
+    e.<span class="fn">Validate</span>(status.<span class="tp">HubInScanned</span>, status.<span class="tp">HubOutscan</span>,
+      statusrules.<span class="tp">FlowForward</span>, ctx)
+  })
+  <span class="kw">if</span> allocs > <span class="num">0</span> {
+    t.<span class="fn">Fatalf</span>(<span class="str">"hot path allocates: %.0f allocs/op"</span>, allocs)
+  }
+}</pre>
+      <div class="concept amber" style="margin-top:12px;">
+        <div class="concept-ttl">Runs on three paths</div>
+        <div class="concept-body">Success path · Failure path · FORCE_* override path. All three must show <code>0 allocs/op</code>. A vtable dispatch, string format, or slice append anywhere on these paths will fail the gate.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">📊</span> Stage 6 — Benchmark Regression</div>
+      <p style="font-size:13px;color:#475569;margin-bottom:14px;">Compares benchmark results against the <code>main</code> branch baseline. A &gt;20% regression in ns/op blocks merge.</p>
+      <table>
+        <thead><tr><th>Benchmark</th><th>Baseline</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td><code>BenchmarkValidate_HotPath</code></td><td>13 ns/op</td><td>&lt; 100 ns/op</td></tr>
+          <tr><td><code>BenchmarkValidate_ForceOverride</code></td><td>6 ns/op</td><td>&lt; 100 ns/op</td></tr>
+          <tr><td><code>BenchmarkValidate_InterSystemHandoff</code></td><td>4 ns/op</td><td>&lt; 100 ns/op</td></tr>
+          <tr><td><code>BenchmarkNewEngine</code></td><td>~5ms</td><td>&lt; 30ms</td></tr>
+        </tbody>
+      </table>
+      <pre class="codeblock" style="margin-top:14px;"><span class="cm"># CI step — benchstat comparison</span>
+<span class="fn">go test</span> -bench=. -benchmem -count=5 | <span class="fn">tee</span> new.txt
+<span class="fn">benchstat</span> main-baseline.txt new.txt
+<span class="cm"># exits non-zero if any benchmark regresses &gt; 20%</span></pre>
+    </div>
+
+  </div>
+
+  <!-- Parity test detail -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🌐</span> Stage 7 — Cross-Language Parity Tests</div>
+    <div class="grid-2">
+      <div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    FIX["parity_cases.json\n500+ test cases\ngenerated from rules.yaml\n{from, to, flow, ctx, expected_valid,\nexpected_override, expected_mode}"]
+
+    FIX --> GO["Go\ngo test -run TestParity"]
+    FIX --> JAVA["Java\nmvn test -Dtest=ParityTest"]
+    FIX --> JS["JavaScript\nnpm test -- --grep parity"]
+    FIX --> PY["Python\npytest tests/test_parity.py"]
+
+    GO   --> CMP["Compare all outputs\nDivergence on any case\n= build failure"]
+    JAVA --> CMP
+    JS   --> CMP
+    PY   --> CMP
+          </pre>
+        </div>
+      </div>
+      <div>
+        <div class="concept">
+          <div class="concept-ttl">What a parity test case looks like</div>
+          <div class="concept-body">Each JSON fixture encodes inputs and <em>expected</em> outputs. Every language implementation runs all 500+ cases. The CI runner diffs the output matrices — if Go says <code>Valid=true</code> but Java says <code>Valid=false</code> for the same input, the pipeline fails.</div>
+        </div>
+        <pre class="codeblock"><span class="cm">// parity_cases.json (excerpt)</span>
+{
+  <span class="str">"id"</span>: <span class="str">"tc_042"</span>,
+  <span class="str">"current"</span>: <span class="str">"HUB-IN-SCANNED"</span>,
+  <span class="str">"next"</span>: <span class="str">"FORCE_HUB_OUTSCAN"</span>,
+  <span class="str">"flow"</span>: <span class="str">"FORWARD"</span>,
+  <span class="str">"source_system"</span>: <span class="str">"HUB_SYSTEM"</span>,
+  <span class="str">"operator_id"</span>: <span class="str">"OPS-99"</span>,
+  <span class="str">"expected_valid"</span>: <span class="kw">true</span>,
+  <span class="str">"expected_override"</span>: <span class="kw">true</span>,
+  <span class="str">"expected_mode"</span>: <span class="str">"INTRA_SYSTEM"</span>
+}</pre>
+        <div class="concept red" style="margin-top:12px;">
+          <div class="concept-ttl">Auto-generated, not hand-written</div>
+          <div class="concept-body">The codegen pipeline generates parity cases from <code>rules.yaml</code> every time the spec changes. Hand-written parity fixtures would go stale silently — generated ones cannot.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spec repo CI -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📁</span> Spec Repository CI — When rules.yaml Changes</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart LR
+    PR2["PR to\nstatus-rule-spec\n(rules.yaml diff)"]
+
+    V["Spec schema\nvalidation"]
+    CG["Run codegen\nGenerate enums +\nadjacency init\nfor all 4 languages"]
+    PAR["Generate parity\ntest fixtures\nparity_cases.json"]
+    TEST["Run parity tests\nagainst all 4 language\ncurrent implementations"]
+
+    PRL["Open library PRs\nGo · Java · JS · Python\n(automated)"]
+
+    PR2 --> V --> CG --> PAR --> TEST
+    TEST -->|"all pass"| PRL
+    TEST -->|"divergence found"| BLOCK["❌ Block spec PR\nExisting impl\nconflicts with new spec\nMust fix library first"]
+
+    PRL --> MINOR["Minor/Patch version bump\nAuto-merge if all\nlibrary tests pass"]
+    PRL --> MAJOR["Major version bump\nRequires manual approval\nfrom domain owner +\nPlatform team member"]
+      </pre>
+    </div>
+    <p class="diagram-cap">A spec change that breaks an existing language implementation is caught before the spec PR merges — not after libraries are shipped.</p>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 5 — CD PIPELINE
+═══════════════════════════════════════════════════ -->
+<div id="tab-cd" class="tab-content">
+
+  <div class="section-title">CD Pipeline</div>
+  <div class="section-sub">How a rule change travels from a spec PR to production across all four source systems — with rollback and version enforcement.</div>
+
+  <!-- Stats -->
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Source Systems to Deploy</div></div>
+    <div class="stat"><div class="stat-val">Semver</div><div class="stat-lbl">Versioning Strategy</div></div>
+    <div class="stat"><div class="stat-val">2</div><div class="stat-lbl">Minor Versions Tolerated Skew</div></div>
+    <div class="stat"><div class="stat-val">Auto</div><div class="stat-lbl">Minor/Patch Merge</div></div>
+  </div>
+
+  <!-- Full CD flow -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🚀</span> End-to-End Release Flow — Spec Change to Production</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart TD
+    ENG["👷 Engineer opens PR\nto status-rule-engine\n• edit spec/rules.yaml\n• update typed status constants\n• add test case in all 4 languages"]
+
+    REV["👥 Required Approvals\n• Domain owner of affected source system\n• One Platform team member"]
+
+    SPECMERGE["✅ PR merged\nCI runs all 4 test suites in parallel"]
+
+    subgraph TESTS["CI — All 4 packages must pass"]
+      GOTEST["go test ./...\ngithub.com/logistics-oss/status-rules"]
+      JTEST["mvn test\nio.logistics:status-rules"]
+      JSTEST["npm test\n@logistics-oss/status-rules"]
+      PYTEST["pytest tests/ -v\nlogistics-status-rules"]
+    end
+
+    SPECMERGE --> TESTS
+
+    PUBLISH["📦 Publish new version\nto package registries"]
+    GOTEST --> PUBLISH
+    JTEST --> PUBLISH
+    JSTEST --> PUBLISH
+    PYTEST --> PUBLISH
+
+    AUTOMERGE{"Semver bump type?"}
+    PUBLISH --> AUTOMERGE
+
+    AUTOMERGE -->|"patch or minor\nall tests pass"| AUTOPUB["Auto-publish\nto registries"]
+    AUTOMERGE -->|"major\n(breaking change)"| MANUALREV["Manual approval required\nDomain owner + Platform"]
+
+    MANUALREV --> AUTOPUB
+
+    AUTOPUB --> DEPLOYS
+
+    subgraph DEPLOYS["Source System Redeployments (coordinated rolling)"]
+      BKDEP["Booking System (Java)\nbump pom.xml version\nrolling restart"]
+      HUBDEP["Hub Ops System (Go)\nbump go.mod version\nrolling restart"]
+      DELDEP["Delivery System (Node.js)\nbump package.json version\nrolling restart"]
+      TPLDEP["3PL Adapters (Python)\nbump pyproject.toml version\nrolling restart"]
+    end
+
+    DEPLOYS --> TRACK["📊 Tracking Ingestion\nreads spec_version from\nevery incoming event\nflags stale versions"]
+    TRACK --> DONE["✅ All systems on new spec\nNo version skew alerts"]
+      </pre>
+    </div>
+  </div>
+
+  <!-- Semver -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🏷</span> Spec Versioning — What Each Bump Means</div>
+    <table>
+      <thead>
+        <tr><th>Bump</th><th>Example Change</th><th>Library PR merge</th><th>Source system action</th><th>Risk</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:#16a34a;">Patch</strong><br><code>1.0.x</code></td>
+          <td>Fix a status description, correct metadata, add a comment</td>
+          <td><span class="chk">✓</span> Auto-merge</td>
+          <td>No redeployment required (no graph change)</td>
+          <td style="color:#16a34a;">None</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#2563eb;">Minor</strong><br><code>1.x.0</code></td>
+          <td>Add a new valid transition (backward compatible — new capability, existing transitions unchanged)</td>
+          <td><span class="chk">✓</span> Auto-merge if tests pass</td>
+          <td>Bump library + rolling restart per system</td>
+          <td style="color:#2563eb;">Low</td>
+        </tr>
+        <tr class="hl">
+          <td><strong style="color:#dc2626;">Major</strong><br><code>x.0.0</code></td>
+          <td>Remove or modify an existing transition (breaking — callers that depended on the removed edge will now fail validation)</td>
+          <td>Manual approval required<br>(domain owner + Platform)</td>
+          <td>Coordinated cutover across all 4 systems in the same deploy window</td>
+          <td style="color:#dc2626;">High — must coordinate</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Rolling deployment detail -->
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-title"><span class="icon">🔁</span> Rolling Deployment — Per Source System</div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    participant REG as Internal Registry
+    participant SYS as Source System (e.g. Hub)
+    participant K8S as Kubernetes
+    participant TRK as Tracking Ingestion
+
+    REG->>SYS: new library version available
+    SYS->>SYS: bump go.mod / pom.xml
+    SYS->>K8S: rolling restart (1 pod at a time)
+
+    Note over K8S: Pod starts
+    K8S->>SYS: NewEngine() called
+    Note over SYS: Spec loaded + compiled\ninto adjacency map ~5ms
+    SYS->>K8S: /health returns\nspec_version: 1.1.0
+
+    K8S->>K8S: health check passes\nnext pod restarts
+
+    Note over TRK: Reads spec_version\nfrom every event header
+    TRK->>TRK: Detects mixed versions\nduring rolling window
+    Note over TRK: Acceptable — both\nversions are forward compatible
+        </pre>
+      </div>
+      <p class="diagram-cap">During a rolling restart, some pods run the old spec version and some run the new one. For minor/patch bumps this is safe — old spec accepts a subset of what the new spec accepts.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">⏪</span> Rollback Procedure</div>
+      <div class="concept red">
+        <div class="concept-ttl">Library rollback (minor/patch)</div>
+        <div class="concept-body">Pin the previous library version in <code>go.mod</code> (or <code>pom.xml</code> / <code>package.json</code>), merge the revert PR, rolling restart. The bundled spec reverts with the library — no config store to revert separately. Typical rollback time: same as a normal deploy.</div>
+      </div>
+      <div class="concept amber">
+        <div class="concept-ttl">Major version rollback (breaking change)</div>
+        <div class="concept-body">All four source systems must roll back in the same window. Because the old spec rejects transitions the new spec added, there is no safe partial rollback. Coordinate the revert deploy across all systems before any traffic is shifted back.</div>
+      </div>
+      <div class="concept">
+        <div class="concept-ttl">Rollback does NOT require a spec repo revert</div>
+        <div class="concept-body">The spec and the library are separate versioned artifacts. Rolling back the library (redeploying v1.0.0) automatically rolls back the spec — the library bundles the spec at build time. The spec repo history is preserved for audit.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Spec version enforcement -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📡</span> Spec Version Skew Detection — Runtime Enforcement</div>
+    <div class="grid-2">
+      <div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    SRC["Source System emits event\n{awb, status, spec_version: 2.5.0}"]
+    TRK["Tracking Ingestion layer\nreads spec_version field"]
+
+    CHECK{"spec_version vs\ncurrent - 2 minor versions"}
+    OK["✅ Accept event\nlog spec_version for metrics"]
+    STALE["⚠️ Accept event\nflag stale_spec_version=true\nAlert → source system\non-call owner"]
+    REJECT["❌ Never rejected\nStale events still\ncontain valid data"]
+
+    SRC --> TRK --> CHECK
+    CHECK -->|"within tolerance"| OK
+    CHECK -->|"older than current - 2 minor"| STALE
+    STALE --> REJECT
+          </pre>
+        </div>
+      </div>
+      <div>
+        <div class="concept">
+          <div class="concept-ttl">Why tolerate 2 minor versions of skew</div>
+          <div class="concept-body">Source systems have their own release cycles. Hub Ops may deploy weekly; the Delivery mobile app may deploy monthly. A hard rejection on stale spec versions would cause operational outages during normal deployment windows. The 2-minor-version window gives teams enough runway to upgrade without urgency.</div>
+        </div>
+        <div class="concept amber">
+          <div class="concept-ttl">What the on-call alert triggers</div>
+          <div class="concept-body">When a source system is &gt;2 minor versions behind, the tracking ingestion layer fires a <strong>low-severity alert</strong> to that system's on-call channel. It is not a page — it is a ticket to upgrade. Repeated alerts on the same system escalate to the Platform team.</div>
+        </div>
+
+        <table style="margin-top:12px;">
+          <thead><tr><th>Dashboard Metric</th><th>Alert Threshold</th></tr></thead>
+          <tbody>
+            <tr><td><code>validation_invalid_rate</code></td><td>&gt;0.1% of calls → page source system owner</td></tr>
+            <tr><td><code>validation_override_rate</code></td><td>&gt;5% of calls → page ops lead</td></tr>
+            <tr><td><code>inter_system_transition_rate</code></td><td>Sudden spike → investigate handoff failures</td></tr>
+            <tr><td><code>spec_version_skew</code></td><td>Any source &gt;2 minor versions behind → warn</td></tr>
+            <tr><td><code>validation_p99_latency</code></td><td>&gt;500µs → investigate CPU contention</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change governance -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📝</span> Spec Change Governance Process</div>
+    <div class="mermaid-wrap">
+      <pre class="mermaid">
+flowchart LR
+    REQ["Engineer opens spec PR\n• YAML diff\n• Justification comment\n• New test case proving the change"]
+
+    subgraph REVIEW["Review Requirements"]
+      R1["Domain owner of\naffected source system\n(mandatory)"]
+      R2["One Platform\nteam member\n(mandatory)"]
+    end
+
+    REQ --> REVIEW
+
+    REVIEW --> IMPACT{"Impact\nassessment"}
+    IMPACT -->|"patch"| FAST["Fast track\nMerge same day\nNo deploy coordination"]
+    IMPACT -->|"minor\nnew transitions added"| STD["Standard track\n• Notify source system leads\n• Merge after 24h notice\n• Coordinate deploy window"]
+    IMPACT -->|"major\nexisting transitions changed"| COORD["Coordinated track\n• All 4 system leads sign off\n• Joint deploy window scheduled\n• Rollback plan documented\n• Merge only after deploy plan agreed"]
+
+    FAST --> MERGE["Spec PR merged\nCodegen + library PRs triggered"]
+    STD  --> MERGE
+    COORD --> MERGE
+      </pre>
+    </div>
+    <div class="concept red" style="margin-top:16px;">
+      <div class="concept-ttl">The golden rule: spec changes are schema migrations</div>
+      <div class="concept-body">Every status transition rule is load-bearing infrastructure. Removing or changing a transition is as consequential as dropping a database column. The governance process exists to ensure that operational teams, not just engineers, sign off on changes that affect real shipment flows.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 6 — STATUS REGISTRY
+═══════════════════════════════════════════════════ -->
+<div id="tab-statuses" class="tab-content">
+
+  <div class="section-title">Status Registry</div>
+  <div class="section-sub">All 55 shipment statuses organised by milestone — sourced from <code>spec/rules.yaml</code> via <code>statuses.md</code></div>
+
+  <!-- Status Pipeline Journey -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🗺</span> Shipment Status Journey — click any status to see valid next moves</div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#93c5fd;"></div>Booking System</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fcd34d;"></div>Hub Ops System</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6ee7b7;"></div>Delivery System</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c4b5fd;"></div>3PL</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5;"></div>Terminal (end state)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fdba74;"></div>FORCE_* Override</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a5b4fc;"></div>Exception (wildcard)</div>
+    </div>
+
+    <div id="pipeline" class="pipeline" style="min-height:160px;align-items:center;justify-content:center;">
+      <p style="color:#94a3b8;text-align:center;padding:20px;">Loading…</p>
+    </div>
+
+    <div id="next-hint" style="display:none; margin-top:10px; padding:14px 18px; background:#f0fdf4; border:2px solid #86efac; border-radius:10px; font-size:13px;">
+      <strong id="next-hint-from"></strong>
+      <div id="next-hint-body" style="margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <div id="statuses-summary-row" class="grid-4" style="margin-bottom:24px;"></div>
+
+  <div id="statuses-groups"></div>
+
+</div>
+
+<!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  window._mermaid = mermaid;
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      primaryColor:       '#eef2ff',
+      primaryTextColor:   '#1e1b4b',
+      primaryBorderColor: '#818cf8',
+      lineColor:          '#6366f1',
+      secondaryColor:     '#f0fdf4',
+      tertiaryColor:      '#fff7ed',
+      noteBkgColor:       '#fef9c3',
+      noteTextColor:      '#713f12'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence:  { actorMargin: 60, messageMargin: 20 }
+  });
+  // Render the initially active tab
+  const active = document.querySelector('.tab-content.active');
+  if (active) mermaid.run({ nodes: active.querySelectorAll('.mermaid') });
+</script>
+
+<!-- ── Embedded statuses data (mirrors docs/statuses.md — update both in the same PR) ── -->
+<script type="text/plain" id="statuses-md">
+# Status Registry — Logistics Status Rule Engine
+
+**Spec version:** `1.0.0`
+**Source of truth:** `spec/rules.yaml`
+**Used by:** `demo.html` (fetched and parsed on load)
+
+> This file is the human-readable source for the demo.
+> The authoritative machine-readable source is always `spec/rules.yaml`.
+> When `rules.yaml` changes, update this file in the same PR.
+
+---
+
+## Statuses
+
+Columns: `Code | ID | Category | Mile | System | Flows | Terminal`
+
+| Code | ID | Category | Mile | System | Flows | Terminal |
+|------|----|----------|------|--------|-------|----------|
+| DRAFT | 0 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | no |
+| BOOKED | 1 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | no |
+| PART_PAYMENT_PENDING | 2 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | no |
+| UPDATED_BOOKING | 3 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | no |
+| MANIFESTED | 4 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | no |
+| READY_FOR_PICKUP | 5 | FIRST_MILE | FIRST | Hub | FORWARD | no |
+| INSCANNED | 6 | FIRST_MILE | FIRST | Hub | FORWARD,REVERSE | no |
+| HUB-IN-SCANNED | 7 | MIDDLE_MILE | MIDDLE | Hub | FORWARD,REVERSE | no |
+| BAGGED | 8 | MIDDLE_MILE | MIDDLE | Hub | FORWARD,REVERSE | no |
+| BAG_CREATED | 9 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| BAG_FINALISED | 10 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| BAG_DELETED | 11 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| INSCANNED_AT_TRANSIT | 12 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| HUB-OUTSCAN | 13 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| REMOVED_FROM_BAG | 14 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| REMOVED_FROM_LCR | 15 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| IN-BAG-INSCAN | 16 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| IN-BAG-OUTSCAN | 17 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| IN_BAG_OUTSCAN_TO_CP | 18 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| OUT_SCAN_TO_CP | 19 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| OUT_SCAN_TO_3PL | 20 | MIDDLE_MILE | MIDDLE | Hub | FORWARD | no |
+| INSCANNED_AT_CP | 21 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| SCHEDULED_FOR_TRIP | 22 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| OUT_FOR_DELIVERY | 23 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| ATTEMPTED | 24 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| UNDELIVERED | 25 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| RETURN_INITIATED | 26 | LAST_MILE | LAST_MILE | Delivery | FORWARD,REVERSE | no |
+| RETURN_REVOKED | 27 | LAST_MILE | LAST_MILE | Delivery | FORWARD | no |
+| DELIVERED | 28 | LAST_MILE | LAST_MILE | Delivery | FORWARD | yes |
+| RTO_DELIVERED | 29 | REVERSE | LAST_MILE | Delivery | REVERSE | yes |
+| CANCELLED | 30 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | yes |
+| REJECTED | 31 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | yes |
+| REJECTED_BY_HO | 32 | ORDER_BOOKING | PRE_MILE | Booking | FORWARD | yes |
+| RTO | 33 | REVERSE | MIDDLE | Hub | REVERSE | no |
+| RTO_OUT_FOR_DELIVERY | 34 | REVERSE | LAST_MILE | Delivery | REVERSE | no |
+| RTO_UNDELIVERED | 35 | REVERSE | LAST_MILE | Delivery | REVERSE | no |
+| DAMAGED | 36 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| MIS_ROUTED | 37 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| REROUTED | 38 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| EXCESS_INSCAN | 39 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| PINCODE_AUDITED | 40 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| WEIGHT_AUDITED | 41 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| MODE_AUDITED | 42 | EXCEPTION | ANY | Hub | FORWARD,REVERSE | no |
+| FORCE_HUB_OUTSCAN | 43 | OVERRIDE | MIDDLE | Hub | FORWARD | no |
+| FORCE_BAG | 44 | OVERRIDE | MIDDLE | Hub | FORWARD | no |
+| FORCE_BAG_ATTEMPTED | 45 | OVERRIDE | MIDDLE | Hub | FORWARD | no |
+| FORCE_OUTSCAN_TO_CP | 46 | OVERRIDE | MIDDLE | Hub | FORWARD | no |
+| 3PL_ITEM_BOOK | 47 | 3PL | MIDDLE | 3PL | FORWARD | no |
+| 3PL_ITEM_DELIVERY | 48 | 3PL | LAST_MILE | 3PL | FORWARD | yes |
+| 3PL_ITEM_ONHOLD | 49 | 3PL | MIDDLE | 3PL | FORWARD | no |
+| 3PL_ITEM_REDIRECT | 50 | 3PL | MIDDLE | 3PL | FORWARD | no |
+| 3PL_ITEM_RETURN | 51 | 3PL | REVERSE | 3PL | REVERSE | no |
+| 3PL_BAG_CLOSE | 52 | 3PL | MIDDLE | 3PL | FORWARD | no |
+| 3PL_BAG_DISPATCH | 53 | 3PL | MIDDLE | 3PL | FORWARD | no |
+| 3PL_BAG_OPEN | 54 | 3PL | MIDDLE | 3PL | FORWARD | no |
+
+---
+
+## Transitions
+
+Columns: `From | To | Flow | Override | Requires`
+
+`To` may be comma-separated for multiple destinations.
+`Override`: `yes` = FORCE_* edge.
+`Requires`: context key required (e.g. `operator_id`), or blank.
+
+| From | To | Flow | Override | Requires |
+|------|----|------|----------|----------|
+| DRAFT | BOOKED,CANCELLED,REJECTED,REJECTED_BY_HO | FORWARD | no | |
+| BOOKED | PART_PAYMENT_PENDING,UPDATED_BOOKING,MANIFESTED,CANCELLED | FORWARD | no | |
+| PART_PAYMENT_PENDING | BOOKED,CANCELLED | FORWARD | no | |
+| UPDATED_BOOKING | MANIFESTED,CANCELLED | FORWARD | no | |
+| MANIFESTED | READY_FOR_PICKUP,CANCELLED | FORWARD | no | |
+| READY_FOR_PICKUP | INSCANNED,HUB-IN-SCANNED | FORWARD | no | |
+| INSCANNED | HUB-IN-SCANNED,BAGGED,BAG_CREATED,INSCANNED_AT_TRANSIT,OUT_SCAN_TO_CP,OUT_SCAN_TO_3PL | FORWARD | no | |
+| HUB-IN-SCANNED | BAGGED,BAG_CREATED,HUB-OUTSCAN,REMOVED_FROM_BAG,REMOVED_FROM_LCR | FORWARD | no | |
+| HUB-IN-SCANNED | FORCE_HUB_OUTSCAN | FORWARD | yes | operator_id |
+| BAGGED | BAG_FINALISED,REMOVED_FROM_BAG,IN-BAG-OUTSCAN,IN_BAG_OUTSCAN_TO_CP | FORWARD | no | |
+| BAGGED | FORCE_BAG | FORWARD | yes | operator_id |
+| BAG_CREATED | BAG_FINALISED,BAG_DELETED | FORWARD | no | |
+| BAG_FINALISED | IN-BAG-OUTSCAN,IN_BAG_OUTSCAN_TO_CP | FORWARD | no | |
+| INSCANNED_AT_TRANSIT | HUB-OUTSCAN,HUB-IN-SCANNED,BAGGED | FORWARD | no | |
+| HUB-OUTSCAN | INSCANNED_AT_TRANSIT,INSCANNED_AT_CP,IN-BAG-INSCAN,OUT_SCAN_TO_CP,OUT_SCAN_TO_3PL | FORWARD | no | |
+| HUB-OUTSCAN | FORCE_OUTSCAN_TO_CP | FORWARD | yes | operator_id |
+| FORCE_BAG | FORCE_BAG_ATTEMPTED | FORWARD | yes | operator_id |
+| INSCANNED_AT_CP | SCHEDULED_FOR_TRIP,OUT_FOR_DELIVERY | FORWARD | no | |
+| SCHEDULED_FOR_TRIP | OUT_FOR_DELIVERY,REMOVED_FROM_LCR | FORWARD | no | |
+| OUT_FOR_DELIVERY | DELIVERED,ATTEMPTED,UNDELIVERED | FORWARD | no | |
+| ATTEMPTED | OUT_FOR_DELIVERY,UNDELIVERED,RETURN_INITIATED | FORWARD | no | |
+| UNDELIVERED | OUT_FOR_DELIVERY,RETURN_INITIATED,INSCANNED_AT_CP | FORWARD | no | |
+| RETURN_INITIATED | RTO,RETURN_REVOKED | REVERSE | no | |
+| RETURN_REVOKED | OUT_FOR_DELIVERY | FORWARD | no | |
+| RTO | RTO_OUT_FOR_DELIVERY,HUB-IN-SCANNED,INSCANNED | REVERSE | no | |
+| RTO_OUT_FOR_DELIVERY | RTO_DELIVERED,RTO_UNDELIVERED | REVERSE | no | |
+| RTO_UNDELIVERED | RTO_OUT_FOR_DELIVERY,HUB-IN-SCANNED | REVERSE | no | |
+| OUT_SCAN_TO_3PL | 3PL_ITEM_BOOK,3PL_BAG_CLOSE | FORWARD | no | |
+| 3PL_ITEM_BOOK | 3PL_ITEM_DELIVERY,3PL_ITEM_ONHOLD,3PL_ITEM_REDIRECT,3PL_ITEM_RETURN | FORWARD | no | |
+| 3PL_BAG_CLOSE | 3PL_BAG_DISPATCH,3PL_BAG_OPEN | FORWARD | no | |
+| 3PL_BAG_DISPATCH | 3PL_BAG_OPEN | FORWARD | no | |
+| 3PL_BAG_OPEN | 3PL_ITEM_BOOK | FORWARD | no | |
+| 3PL_ITEM_ONHOLD | 3PL_ITEM_BOOK,3PL_ITEM_RETURN | FORWARD | no | |
+| 3PL_ITEM_REDIRECT | 3PL_ITEM_BOOK,3PL_ITEM_DELIVERY | FORWARD | no | |
+| 3PL_ITEM_RETURN | INSCANNED,HUB-IN-SCANNED | REVERSE | no | |
+
+---
+
+## Wildcard Targets
+
+These statuses are valid destinations from **any** non-terminal status in any flow.
+
+DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, MODE_AUDITED
+</script>
+
+<script>
+  // ── Status data — parsed from the embedded statuses-md block above ──────────
+  let TRANSITIONS = {}, WILDCARDS = [], TERMINALS = new Set(), FORCE = new Set(), OWNERS = {}, ALL_STATUSES = [], STATUSES_DATA = [];
+
+  const vFrom = document.getElementById('v-from');
+  const vTo   = document.getElementById('v-to');
+
+  function initFromMD() {
+    const text = document.getElementById('statuses-md').textContent;
+
+    // ── Parse the three sections of statuses.md ─────────────────────────────
+    const lines = text.split('\n');
+    let section = null;
+    const statusRows = [], transitionRows = [];
+    let wildcardLine = '';
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.startsWith('## Statuses'))    { section = 'statuses';    continue; }
+      if (line.startsWith('## Transitions')) { section = 'transitions'; continue; }
+      if (line.startsWith('## Wildcard'))    { section = 'wildcards';   continue; }
+      // Skip separator rows, header rows, horizontal rules, and blank lines
+      if (!line || line.startsWith('---') || /^\|\s*[-:]+/.test(line) ||
+          line.startsWith('| Code') || line.startsWith('| From')) continue;
+
+      if (section === 'statuses' && line.startsWith('|')) {
+        const c = line.split('|').map(x => x.trim()).filter(Boolean);
+        if (c.length >= 7)
+          statusRows.push({ code: c[0], id: +c[1], category: c[2], mile: c[3], system: c[4], flows: c[5], terminal: c[6] });
+      } else if (section === 'transitions' && line.startsWith('|')) {
+        const c = line.split('|').map(x => x.trim()).filter(Boolean);
+        if (c.length >= 4)
+          transitionRows.push({ from: c[0], to: c[1], flow: c[2].toUpperCase(), override: c[3], requires: c[4] || '' });
+      } else if (section === 'wildcards' && !line.startsWith('#') && !line.startsWith('>')) {
+        wildcardLine += line;
+      }
+    }
+
+    // ── Build data structures ────────────────────────────────────────────────
+    STATUSES_DATA = statusRows;
+    WILDCARDS = wildcardLine.split(',').map(w => w.trim()).filter(Boolean);
+
+    statusRows.forEach(s => {
+      OWNERS[s.code] = s.system;
+      if (s.terminal === 'yes') TERMINALS.add(s.code);
+      if (s.category === 'OVERRIDE') FORCE.add(s.code);
+    });
+
+    transitionRows.forEach(row => {
+      const tos = row.to.split(',').map(t => t.trim()).filter(Boolean);
+      if (!TRANSITIONS[row.from]) TRANSITIONS[row.from] = {};
+      if (!TRANSITIONS[row.from][row.flow]) TRANSITIONS[row.from][row.flow] = [];
+      TRANSITIONS[row.from][row.flow].push(...tos);
+    });
+
+    ALL_STATUSES = statusRows.map(s => s.code).sort();
+
+    populateDropdowns();
+    renderPipeline();
+    renderStatusesTab();
+  }
+
+  function populateDropdowns() {
+    [vFrom, vTo].forEach(sel => {
+      sel.innerHTML = '<option value="">— select —</option>';
+      ALL_STATUSES.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = s;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function renderPipeline() {
+    const STAGE_DEFS = [
+      { icon: '📋', label: 'Pre-Mile',       sub: 'Booking System',   filter: s => s.category === 'ORDER_BOOKING' },
+      { icon: '🚛', label: 'First Mile',     sub: 'Hub System',        filter: s => s.category === 'FIRST_MILE' },
+      { icon: '🏭', label: 'Middle Mile',    sub: 'Hub System',        filter: s => s.category === 'MIDDLE_MILE' || s.category === 'OVERRIDE' },
+      { icon: '🚚', label: 'Last Mile',      sub: 'Delivery System',   filter: s => s.category === 'LAST_MILE' },
+      { icon: '🔄', label: 'RTO\u00a0/\u00a0Reverse', sub: '',        filter: s => s.category === 'REVERSE' },
+      { icon: '🔗', label: '3PL',            sub: '',                  filter: s => s.category === '3PL' },
+      { icon: '⚠️', label: 'Exceptions',    sub: '(from any status)', filter: s => s.category === 'EXCEPTION' },
+    ];
+
+    function cssClass(s) {
+      if (s.terminal === 'yes') return 'terminal';
+      if (s.category === 'OVERRIDE') return 'override';
+      if (s.category === 'EXCEPTION') return 'except';
+      return ({ Booking: 'booking', Hub: 'hub', Delivery: 'delivery', '3PL': 'tpl' })[s.system] || 'hub';
+    }
+
+    function labelOf(s) {
+      const base = s.code.replace(/_/g, ' ');
+      if (s.category === 'OVERRIDE') return '⚡ ' + base;
+      if (s.terminal === 'yes') return base + (s.category === 'ORDER_BOOKING' ? ' ⛔' : ' ✅');
+      return base;
+    }
+
+    const parts = [];
+    STAGE_DEFS.forEach(stage => {
+      const group = STATUSES_DATA.filter(stage.filter);
+      if (!group.length) return;
+      if (parts.length) parts.push('<div class="p-arrow">→</div>');
+      const items = group.map(s =>
+        `<div class="p-status ${cssClass(s)}" data-code="${s.code}" onclick="selectStatus(this,'${s.code}')">${labelOf(s)}</div>`
+      ).join('');
+      parts.push(
+        `<div class="p-stage">` +
+        `<div class="p-stage-hdr">${stage.icon} ${stage.label}${stage.sub ? '<br>' + stage.sub : ''}</div>` +
+        `<div class="p-statuses">${items}</div>` +
+        `</div>`
+      );
+    });
+
+    document.getElementById('pipeline').className = 'pipeline';
+    document.getElementById('pipeline').style.cssText = '';
+    document.getElementById('pipeline').innerHTML = parts.join('');
+  }
+
+  function renderStatusesTab() {
+    const GROUPS = [
+      { key: 'ORDER_BOOKING', label: 'Pre-Mile',            icon: '📋', sub: 'Booking System',                               accent: '#3b82f6' },
+      { key: 'FIRST_MILE',    label: 'First Mile',          icon: '🚛', sub: 'Hub System',                                   accent: '#f59e0b' },
+      { key: 'MIDDLE_MILE',   label: 'Middle Mile',         icon: '🏭', sub: 'Hub System',                                   accent: '#f59e0b' },
+      { key: 'LAST_MILE',     label: 'Last Mile',           icon: '🚚', sub: 'Delivery System',                              accent: '#10b981' },
+      { key: 'REVERSE',       label: 'Reverse / RTO',       icon: '🔄', sub: 'Hub &amp; Delivery System',                    accent: '#6366f1' },
+      { key: '3PL',           label: '3PL',                 icon: '🔗', sub: '3PL System',                                   accent: '#8b5cf6' },
+      { key: 'EXCEPTION',     label: 'Exceptions',          icon: '⚠️', sub: 'Wildcard — reachable from any non-terminal',   accent: '#6366f1' },
+      { key: 'OVERRIDE',      label: 'FORCE_* Overrides',   icon: '⚡', sub: 'Hub System — requires OperatorID',             accent: '#f97316' },
+    ];
+
+    // ── Summary stat cards ────────────────────────────────────────────────────
+    const counts = {};
+    STATUSES_DATA.forEach(s => { counts[s.category] = (counts[s.category] || 0) + 1; });
+    const terminalCount  = STATUSES_DATA.filter(s => s.terminal === 'yes').length;
+    const wildcardCount  = WILDCARDS.length;
+    const overrideCount  = STATUSES_DATA.filter(s => s.category === 'OVERRIDE').length;
+
+    document.getElementById('statuses-summary-row').innerHTML = [
+      { val: STATUSES_DATA.length,  lbl: 'Total Statuses' },
+      { val: terminalCount,         lbl: 'Terminal States' },
+      { val: wildcardCount,         lbl: 'Wildcard Targets' },
+      { val: overrideCount,         lbl: 'FORCE_* Overrides' },
+    ].map(s =>
+      `<div class="stat"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`
+    ).join('');
+
+    // ── Helper: badge class from status data ─────────────────────────────────
+    function rowBadgeClass(s) {
+      if (s.terminal === 'yes')       return 'b-terminal';
+      if (s.category === 'OVERRIDE')  return 'b-override';
+      if (s.category === 'EXCEPTION') return 'b-except';
+      return { Booking: 'b-booking', Hub: 'b-hub', Delivery: 'b-delivery', '3PL': 'b-3pl' }[s.system] || 'b-hub';
+    }
+
+    // ── One card per group ────────────────────────────────────────────────────
+    const groupsHTML = GROUPS.map(g => {
+      const members = STATUSES_DATA.filter(s => s.category === g.key);
+      if (!members.length) return '';
+
+      const rows = members.map(s => {
+        const terminalCell = s.terminal === 'yes'
+          ? '<span style="color:#dc2626;font-weight:700;">yes ⛔</span>'
+          : '<span style="color:#64748b;">no</span>';
+        const flowParts = s.flows.split(',').map(f => f.trim()).map(f =>
+          `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:${f==='FORWARD'?'#dbeafe':'#ede9fe'};color:${f==='FORWARD'?'#1d4ed8':'#5b21b6'};">${f}</span>`
+        ).join(' ');
+        return `<tr>
+          <td style="padding:8px 12px;font-weight:700;font-size:12px;font-family:monospace;white-space:nowrap;">
+            <span class="badge ${rowBadgeClass(s)}">${s.code}</span>
+          </td>
+          <td style="padding:8px 12px;font-size:12px;color:#64748b;text-align:center;">${s.id}</td>
+          <td style="padding:8px 12px;font-size:12px;color:#475569;">${s.system}</td>
+          <td style="padding:8px 12px;">${flowParts}</td>
+          <td style="padding:8px 12px;font-size:12px;">${terminalCell}</td>
+        </tr>`;
+      }).join('');
+
+      return `<div class="card" style="margin-bottom:20px;">
+        <div class="card-title" style="border-left:4px solid ${g.accent};padding-left:12px;border-radius:0;">
+          <span style="font-size:18px;">${g.icon}</span>
+          <span>${g.label}</span>
+          <span style="background:${g.accent};color:white;font-size:11px;padding:2px 9px;border-radius:12px;font-weight:700;">${members.length}</span>
+          <span style="font-size:12px;font-weight:400;color:#64748b;margin-left:4px;">— ${g.sub}</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Status Code</th>
+                <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">ID</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">System</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Flows</th>
+                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Terminal</th>
+              </tr>
+            </thead>
+            <tbody style="divide-y:#f1f5f9;">${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('statuses-groups').innerHTML = groupsHTML;
+  }
+
+  initFromMD();
+
+  // ── Tab switching ────────────────────────────────────────────────────────────
+  window.switchTab = function(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+
+    // Render mermaid diagrams in this tab (once only)
+    const tab = document.getElementById(id);
+    const unrendered = tab.querySelectorAll('.mermaid:not([data-processed])');
+    if (unrendered.length > 0 && window._mermaid) {
+      window._mermaid.run({ nodes: unrendered });
+    }
+  };
+
+  // ── Flow toggle ──────────────────────────────────────────────────────────────
+  let selectedFlow = 'FORWARD';
+  window.setFlow = function(f) {
+    selectedFlow = f;
+    document.getElementById('btn-forward').classList.toggle('active', f === 'FORWARD');
+    document.getElementById('btn-reverse').classList.toggle('active', f === 'REVERSE');
+  };
+
+  // ── Pipeline reset ────────────────────────────────────────────────────────────
+  window.resetPipeline = function() {
+    document.querySelectorAll('.p-status').forEach(p => p.classList.remove('sel', 'reachable', 'dim'));
+    document.getElementById('next-hint').style.display = 'none';
+    document.getElementById('pipeline-reset-bar').style.display = 'none';
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') resetPipeline(); });
+
+  // ── Pipeline click — highlight reachable nodes, dim everything else ─────────
+  window.selectStatus = function(el, code) {
+    // Toggle off if clicking the already-selected status
+    if (el.classList.contains('sel')) { resetPipeline(); return; }
+
+    const allPills = document.querySelectorAll('.p-status');
+
+    // ── Build the reachable set ──────────────────────────────────────────────
+    const reachable = new Set();
+    if (!TERMINALS.has(code)) {
+      const byFlow = TRANSITIONS[code] || {};
+      ['FORWARD', 'REVERSE'].forEach(fl => (byFlow[fl] || []).forEach(t => reachable.add(t)));
+      WILDCARDS.forEach(w => reachable.add(w));
+    }
+
+    // ── Apply visual states ──────────────────────────────────────────────────
+    allPills.forEach(pill => {
+      pill.classList.remove('sel', 'reachable', 'dim');
+      const c = pill.dataset.code;
+      if (pill === el)           pill.classList.add('sel');
+      else if (reachable.has(c)) pill.classList.add('reachable');
+      else                       pill.classList.add('dim');
+    });
+    document.getElementById('pipeline-reset-bar').style.display = 'flex';
+
+    // ── Hint box ─────────────────────────────────────────────────────────────
+    const hint   = document.getElementById('next-hint');
+    const hdrEl  = document.getElementById('next-hint-from');
+    const bodyEl = document.getElementById('next-hint-body');
+    hint.style.display = 'block';
+
+    if (TERMINALS.has(code)) {
+      hint.style.background = '#fef2f2';
+      hint.style.borderColor = '#fca5a5';
+      hdrEl.textContent = `${code} — Terminal status`;
+      bodyEl.innerHTML = '<span style="color:#991b1b;">No outgoing transitions. This is a final state.</span>';
+      return;
+    }
+
+    hint.style.background = '#f0fdf4';
+    hint.style.borderColor = '#86efac';
+    hdrEl.textContent = `${code} — ${reachable.size} reachable next statuses`;
+
+    // Group by flow for the summary text
+    const byFlow = TRANSITIONS[code] || {};
+    const lines = ['FORWARD', 'REVERSE']
+      .filter(fl => (byFlow[fl] || []).length)
+      .map(fl => {
+        const badges = (byFlow[fl] || []).map(t => {
+          const bc = FORCE.has(t) ? 'b-override' : WILDCARDS.includes(t) ? 'b-except'
+            : ({ Booking:'b-booking', Hub:'b-hub', Delivery:'b-delivery', '3PL':'b-3pl' })[OWNERS[t]] || 'b-hub';
+          return `<span class="badge ${bc}" style="margin:2px 4px 2px 0;">${t}</span>`;
+        }).join('');
+        return `<div style="margin-bottom:6px;"><strong style="font-size:11px;color:#64748b;">${fl}</strong><br>${badges}</div>`;
+      });
+
+    if (lines.length === 0) {
+      bodyEl.innerHTML = '<em style="color:#64748b;">No explicit transitions — only wildcard exception targets apply.</em>';
+    } else {
+      bodyEl.innerHTML = lines.join('') +
+        `<div style="margin-top:6px;font-size:11px;color:#64748b;">+ wildcards (DAMAGED, MIS_ROUTED, … reachable from any non-terminal)</div>`;
+    }
+  };
+
+  // ── Validate button ──────────────────────────────────────────────────────────
+  window.runValidate = function() {
+    const from  = vFrom.value;
+    const to    = vTo.value;
+    const opid  = document.getElementById('v-opid').value.trim();
+    const box   = document.getElementById('result-box');
+    const title = document.getElementById('result-title');
+    const rows  = document.getElementById('result-rows');
+
+    if (!from || !to) {
+      alert('Please select both Current Status and Next Status.');
+      return;
+    }
+
+    let valid = false, errCode = '', reason = '', isOverride = false, mode = '';
+
+    if (from === to) {
+      errCode = 'ErrInvalidTransition'; reason = 'A status cannot transition to itself.';
+    } else if (TERMINALS.has(from)) {
+      errCode = 'ErrTerminalStatus'; reason = `${from} is a terminal status — no outgoing transitions are ever valid.`;
+    } else if (WILDCARDS.includes(to)) {
+      // Wildcards are always valid from any non-terminal in any flow
+      if (!TERMINALS.has(from)) {
+        valid = true;
+        mode  = OWNERS[from] !== OWNERS[to] ? 'InterSystem' : 'IntraSystem';
+      }
+    } else if (FORCE.has(to)) {
+      // FORCE_* edges
+      const forFlow = (TRANSITIONS[from] || {})[selectedFlow] || [];
+      if (forFlow.includes(to)) {
+        if (!opid) {
+          errCode = 'ErrMissingOperatorID'; reason = `${to} is a FORCE_* override — OperatorID is required.`;
+        } else {
+          valid = true; isOverride = true;
+          mode  = OWNERS[from] !== OWNERS[to] ? 'InterSystem' : 'IntraSystem';
+        }
+      } else {
+        errCode = 'ErrInvalidTransition'; reason = `${from} → ${to} is not defined in the spec for ${selectedFlow} flow.`;
+      }
+    } else {
+      const forFlow = (TRANSITIONS[from] || {})[selectedFlow] || [];
+      if (forFlow.includes(to)) {
+        valid = true;
+        const fromOwner = OWNERS[from], toOwner = OWNERS[to];
+        mode = fromOwner !== toOwner ? 'InterSystem' : 'IntraSystem';
+        // SourceSystem check for InterSystem
+        if (mode === 'InterSystem') {
+          const emitter = OWNERS[to];
+          if (!emitter) { valid = false; errCode = 'ErrUnknownStatus'; reason = 'Unknown next status.'; }
+        }
+      } else {
+        // Check if it exists in the other flow
+        const otherFlow   = selectedFlow === 'FORWARD' ? 'REVERSE' : 'FORWARD';
+        const otherExists = ((TRANSITIONS[from] || {})[otherFlow] || []).includes(to);
+        if (otherExists) {
+          errCode = 'ErrFlowMismatch';
+          reason  = `${from} → ${to} is valid in ${otherFlow} flow, not ${selectedFlow}. Check the flow parameter.`;
+        } else {
+          errCode = 'ErrInvalidTransition';
+          reason  = `${from} → ${to} is not defined in the spec.`;
+        }
+      }
+    }
+
+    box.style.display = 'block';
+    box.className = `result-box ${valid ? 'result-valid' : 'result-invalid'}`;
+    title.textContent = valid ? '✅ Valid Transition' : '❌ Transition Blocked';
+
+    const r = (k, v) => `<div class="result-row"><span class="result-key">${k}</span><span class="result-val">${v}</span></div>`;
+    rows.innerHTML = [
+      r('From',           from),
+      r('To',             to),
+      r('Flow',           selectedFlow),
+      valid && r('Mode',  mode),
+      valid && isOverride && r('IsOverride', '⚡ true — audit log required'),
+      !valid && r('ErrorCode',     errCode),
+      !valid && r('AnomalyReason', reason),
+      mode === 'InterSystem' && valid && r('Note', `${from} (${OWNERS[from]}) → ${to} (${OWNERS[to]}): inter-system handoff. Tracking Anomaly Detector holds runtime authority.`),
+    ].filter(Boolean).join('');
+  };
+</script>
+
+<!-- ── Floating pipeline reset pill ── -->
+<div id="pipeline-reset-bar" style="
+  display: none;
+  position: fixed;
+  bottom: 28px;
+  right: 32px;
+  z-index: 999;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 2px solid #4f46e5;
+  border-radius: 999px;
+  padding: 8px 18px 8px 14px;
+  box-shadow: 0 4px 20px rgba(79,70,229,0.25);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4f46e5;
+  transition: box-shadow 0.2s, transform 0.2s;
+  animation: floatIn 0.2s ease;
+" onclick="resetPipeline()" onmouseenter="this.style.boxShadow='0 6px 28px rgba(79,70,229,0.4)'; this.style.transform='translateY(-2px)'" onmouseleave="this.style.boxShadow='0 4px 20px rgba(79,70,229,0.25)'; this.style.transform=''">
+  <span style="font-size:15px; line-height:1;">✕</span>
+  <span>Clear selection</span>
+  <span style="font-size:11px; font-weight:400; color:#a5b4fc; margin-left:2px;">Esc</span>
+</div>
+
+<style>
+  @keyframes floatIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulsePill {
+    0%, 100% { opacity: 1;    box-shadow: 0 4px 20px rgba(79,70,229,0.25); }
+    50%       { opacity: 0.45; box-shadow: 0 2px 8px  rgba(79,70,229,0.1);  }
+  }
+  #pipeline-reset-bar { animation: floatIn 0.2s ease, pulsePill 1.6s ease-in-out 0.2s infinite; }
+  #pipeline-reset-bar:hover { animation: none; opacity: 1; }
+</style>
+
+</body>
+</html>

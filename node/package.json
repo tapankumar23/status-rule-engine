@@ -1,0 +1,9 @@
+{
+  "name": "@logistics-oss/status-rules",
+  "version": "1.0.0",
+  "description": "Shipment status transition rule engine for logistics platforms",
+  "main": "src/index.js",
+  "license": "MIT",
+  "dependencies": { "js-yaml": "^4.1.0" },
+  "scripts": { "test": "node --test test/engine.test.js" }
+}

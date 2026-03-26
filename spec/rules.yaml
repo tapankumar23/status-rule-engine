@@ -1,0 +1,639 @@
+spec_version: "1.0.0"
+spec_date: "2026-03-24"
+
+# Status IDs are 0-indexed in the spec.
+# The Go library adds +1 so that Go Status(0) is always the zero/uninitialized sentinel.
+# IDs must never be renumbered — they are a stable wire contract.
+
+# ── Status registry ───────────────────────────────────────────────────────────
+statuses:
+  # ORDER_BOOKING / PRE_MILE
+  - code: DRAFT
+    id: 0
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: false
+
+  - code: BOOKED
+    id: 1
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: false
+
+  - code: PART_PAYMENT_PENDING
+    id: 2
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: false
+
+  - code: UPDATED_BOOKING
+    id: 3
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: false
+
+  - code: MANIFESTED
+    id: 4
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: false
+
+  # FIRST_MILE
+  - code: READY_FOR_PICKUP
+    id: 5
+    category: FIRST_MILE
+    mile: FIRST
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: INSCANNED
+    id: 6
+    category: FIRST_MILE
+    mile: FIRST
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  # MIDDLE_MILE
+  - code: HUB-IN-SCANNED
+    id: 7
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: BAGGED
+    id: 8
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: BAG_CREATED
+    id: 9
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: BAG_FINALISED
+    id: 10
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: BAG_DELETED
+    id: 11
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: INSCANNED_AT_TRANSIT
+    id: 12
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: HUB-OUTSCAN
+    id: 13
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: REMOVED_FROM_BAG
+    id: 14
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: REMOVED_FROM_LCR
+    id: 15
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: IN-BAG-INSCAN
+    id: 16
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: IN-BAG-OUTSCAN
+    id: 17
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: IN_BAG_OUTSCAN_TO_CP
+    id: 18
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: OUT_SCAN_TO_CP
+    id: 19
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: OUT_SCAN_TO_3PL
+    id: 20
+    category: MIDDLE_MILE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  # LAST_MILE
+  - code: INSCANNED_AT_CP
+    id: 21
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: SCHEDULED_FOR_TRIP
+    id: 22
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: OUT_FOR_DELIVERY
+    id: 23
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: ATTEMPTED
+    id: 24
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: UNDELIVERED
+    id: 25
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: RETURN_INITIATED
+    id: 26
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD, REVERSE]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: RETURN_REVOKED
+    id: 27
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  # TERMINAL STATUSES
+  - code: DELIVERED
+    id: 28
+    category: LAST_MILE
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: DELIVERY_SYSTEM
+    terminal: true
+
+  - code: RTO_DELIVERED
+    id: 29
+    category: REVERSE
+    mile: LAST_MILE
+    flows: [REVERSE]
+    owned_by: DELIVERY_SYSTEM
+    terminal: true
+
+  - code: CANCELLED
+    id: 30
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: true
+
+  - code: REJECTED
+    id: 31
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: true
+
+  - code: REJECTED_BY_HO
+    id: 32
+    category: ORDER_BOOKING
+    mile: PRE_MILE
+    flows: [FORWARD]
+    owned_by: BOOKING_SYSTEM
+    terminal: true
+
+  # RTO / REVERSE
+  - code: RTO
+    id: 33
+    category: REVERSE
+    mile: MIDDLE
+    flows: [REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: RTO_OUT_FOR_DELIVERY
+    id: 34
+    category: REVERSE
+    mile: LAST_MILE
+    flows: [REVERSE]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  - code: RTO_UNDELIVERED
+    id: 35
+    category: REVERSE
+    mile: LAST_MILE
+    flows: [REVERSE]
+    owned_by: DELIVERY_SYSTEM
+    terminal: false
+
+  # EXCEPTION WILDCARDS — valid destination from any non-terminal status in any flow
+  - code: DAMAGED
+    id: 36
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: MIS_ROUTED
+    id: 37
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: REROUTED
+    id: 38
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: EXCESS_INSCAN
+    id: 39
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: PINCODE_AUDITED
+    id: 40
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: WEIGHT_AUDITED
+    id: 41
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: MODE_AUDITED
+    id: 42
+    category: EXCEPTION
+    mile: ANY
+    flows: [FORWARD, REVERSE]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  # FORCE_* OVERRIDE STATUSES
+  # These are first-class edges in the graph, not exemptions.
+  # They require operator_id in context and return IsOverride: true.
+  - code: FORCE_HUB_OUTSCAN
+    id: 43
+    category: OVERRIDE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: FORCE_BAG
+    id: 44
+    category: OVERRIDE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: FORCE_BAG_ATTEMPTED
+    id: 45
+    category: OVERRIDE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  - code: FORCE_OUTSCAN_TO_CP
+    id: 46
+    category: OVERRIDE
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: HUB_SYSTEM
+    terminal: false
+
+  # 3PL
+  - code: 3PL_ITEM_BOOK
+    id: 47
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_ITEM_DELIVERY
+    id: 48
+    category: 3PL
+    mile: LAST_MILE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: true
+
+  - code: 3PL_ITEM_ONHOLD
+    id: 49
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_ITEM_REDIRECT
+    id: 50
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_ITEM_RETURN
+    id: 51
+    category: 3PL
+    mile: REVERSE
+    flows: [REVERSE]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_BAG_CLOSE
+    id: 52
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_BAG_DISPATCH
+    id: 53
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+  - code: 3PL_BAG_OPEN
+    id: 54
+    category: 3PL
+    mile: MIDDLE
+    flows: [FORWARD]
+    owned_by: SYSTEM_3PL
+    terminal: false
+
+# ── Exception wildcards ───────────────────────────────────────────────────────
+# These statuses are valid as a next status from ANY non-terminal status in ANY flow.
+# Expanded into the adjacency map at compile time — not enumerated as N×7 edges.
+wildcard_targets:
+  - DAMAGED
+  - MIS_ROUTED
+  - REROUTED
+  - EXCESS_INSCAN
+  - PINCODE_AUDITED
+  - WEIGHT_AUDITED
+  - MODE_AUDITED
+
+# ── Initial statuses ──────────────────────────────────────────────────────────
+# Valid first statuses for new shipments. Used by ValidateInitial().
+# No prior status exists; Validate() must not be called.
+initial_statuses:
+  - code: DRAFT
+    flow: FORWARD
+
+# ── Transitions ───────────────────────────────────────────────────────────────
+transitions:
+  # Pre-Mile / Booking
+  - from: DRAFT
+    to: [BOOKED, CANCELLED, REJECTED, REJECTED_BY_HO]
+    flow: FORWARD
+
+  - from: BOOKED
+    to: [PART_PAYMENT_PENDING, UPDATED_BOOKING, MANIFESTED, CANCELLED]
+    flow: FORWARD
+
+  - from: PART_PAYMENT_PENDING
+    to: [BOOKED, CANCELLED]
+    flow: FORWARD
+
+  - from: UPDATED_BOOKING
+    to: [MANIFESTED, CANCELLED]
+    flow: FORWARD
+
+  - from: MANIFESTED
+    to: [READY_FOR_PICKUP, CANCELLED]
+    flow: FORWARD
+
+  # First Mile
+  - from: READY_FOR_PICKUP
+    to: [INSCANNED, HUB-IN-SCANNED]
+    flow: FORWARD
+
+  # Middle Mile — normal
+  - from: INSCANNED
+    to: [HUB-IN-SCANNED, BAGGED, BAG_CREATED, INSCANNED_AT_TRANSIT, OUT_SCAN_TO_CP, OUT_SCAN_TO_3PL]
+    flow: FORWARD
+
+  - from: HUB-IN-SCANNED
+    to: [BAGGED, BAG_CREATED, HUB-OUTSCAN, REMOVED_FROM_BAG, REMOVED_FROM_LCR]
+    flow: FORWARD
+
+  - from: HUB-OUTSCAN
+    to: [INSCANNED_AT_TRANSIT, INSCANNED_AT_CP, IN-BAG-INSCAN, OUT_SCAN_TO_CP, OUT_SCAN_TO_3PL]
+    flow: FORWARD
+
+  - from: BAGGED
+    to: [BAG_FINALISED, REMOVED_FROM_BAG, IN-BAG-OUTSCAN, IN_BAG_OUTSCAN_TO_CP]
+    flow: FORWARD
+
+  - from: BAG_CREATED
+    to: [BAG_FINALISED, BAG_DELETED]
+    flow: FORWARD
+
+  - from: BAG_FINALISED
+    to: [IN-BAG-OUTSCAN, IN_BAG_OUTSCAN_TO_CP]
+    flow: FORWARD
+
+  - from: INSCANNED_AT_TRANSIT
+    to: [HUB-OUTSCAN, HUB-IN-SCANNED, BAGGED]
+    flow: FORWARD
+
+  # Middle Mile — FORCE_* override edges
+  # Reviewers: these are intentional override edges, not spec errors.
+  - from: HUB-IN-SCANNED
+    to: FORCE_HUB_OUTSCAN
+    flow: FORWARD
+    is_override: true
+    requires_context: [operator_id]
+
+  - from: BAGGED
+    to: FORCE_BAG
+    flow: FORWARD
+    is_override: true
+    requires_context: [operator_id]
+
+  - from: FORCE_BAG
+    to: FORCE_BAG_ATTEMPTED
+    flow: FORWARD
+    is_override: true
+    requires_context: [operator_id]
+
+  - from: HUB-OUTSCAN
+    to: FORCE_OUTSCAN_TO_CP
+    flow: FORWARD
+    is_override: true
+    requires_context: [operator_id]
+
+  # Last Mile
+  - from: INSCANNED_AT_CP
+    to: [SCHEDULED_FOR_TRIP, OUT_FOR_DELIVERY]
+    flow: FORWARD
+
+  - from: SCHEDULED_FOR_TRIP
+    to: [OUT_FOR_DELIVERY, REMOVED_FROM_LCR]
+    flow: FORWARD
+
+  - from: OUT_FOR_DELIVERY
+    to: [DELIVERED, ATTEMPTED, UNDELIVERED]
+    flow: FORWARD
+
+  - from: ATTEMPTED
+    to: [OUT_FOR_DELIVERY, UNDELIVERED, RETURN_INITIATED]
+    flow: FORWARD
+
+  - from: UNDELIVERED
+    to: [OUT_FOR_DELIVERY, RETURN_INITIATED, INSCANNED_AT_CP]
+    flow: FORWARD
+
+  # RTO / Reverse
+  - from: RETURN_INITIATED
+    to: [RTO, RETURN_REVOKED]
+    flow: REVERSE
+
+  - from: RETURN_REVOKED
+    to: [OUT_FOR_DELIVERY]
+    flow: FORWARD
+
+  - from: RTO
+    to: [RTO_OUT_FOR_DELIVERY, HUB-IN-SCANNED, INSCANNED]
+    flow: REVERSE
+
+  - from: RTO_OUT_FOR_DELIVERY
+    to: [RTO_DELIVERED, RTO_UNDELIVERED]
+    flow: REVERSE
+
+  - from: RTO_UNDELIVERED
+    to: [RTO_OUT_FOR_DELIVERY, HUB-IN-SCANNED]
+    flow: REVERSE
+
+  # 3PL
+  - from: OUT_SCAN_TO_3PL
+    to: [3PL_ITEM_BOOK, 3PL_BAG_CLOSE]
+    flow: FORWARD
+
+  - from: 3PL_ITEM_BOOK
+    to: [3PL_ITEM_DELIVERY, 3PL_ITEM_ONHOLD, 3PL_ITEM_REDIRECT, 3PL_ITEM_RETURN]
+    flow: FORWARD
+
+  - from: 3PL_BAG_CLOSE
+    to: [3PL_BAG_DISPATCH, 3PL_BAG_OPEN]
+    flow: FORWARD
+
+  # 3PL_BAG_DISPATCH → 3PL_BAG_OPEN models inbound receipt at a downstream 3PL hub.
+  # This is NOT a loop — it represents the bag arriving and being opened at the next
+  # facility. Reviewers: this edge is intentional.
+  - from: 3PL_BAG_DISPATCH
+    to: [3PL_BAG_OPEN]
+    flow: FORWARD
+
+  - from: 3PL_BAG_OPEN
+    to: [3PL_ITEM_BOOK]
+    flow: FORWARD
+
+  - from: 3PL_ITEM_ONHOLD
+    to: [3PL_ITEM_BOOK, 3PL_ITEM_RETURN]
+    flow: FORWARD
+
+  - from: 3PL_ITEM_REDIRECT
+    to: [3PL_ITEM_BOOK, 3PL_ITEM_DELIVERY]
+    flow: FORWARD
+
+  - from: 3PL_ITEM_RETURN
+    to: [INSCANNED, HUB-IN-SCANNED]
+    flow: REVERSE
