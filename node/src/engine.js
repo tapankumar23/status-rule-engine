@@ -37,14 +37,15 @@ const ADJ_SIZE = 8192; // 64 × 64 × 2
 
 // ── Error codes ───────────────────────────────────────────────────────────────
 
-const ERR_NONE               = 'ErrNone';
-const ERR_ZERO_VALUE         = 'ErrZeroValueStatus';
-const ERR_UNKNOWN_STATUS     = 'ErrUnknownStatus';
-const ERR_TERMINAL_STATUS    = 'ErrTerminalStatus';
-const ERR_FLOW_MISMATCH      = 'ErrFlowMismatch';
-const ERR_INVALID_TRANSITION = 'ErrInvalidTransition';
-const ERR_MISSING_OP_ID      = 'ErrMissingOperatorID';
-const ERR_INVALID_SRC_SYS    = 'ErrInvalidSourceSystem';
+const ERR_NONE                       = 'ErrNone';
+const ERR_ZERO_VALUE                 = 'ErrZeroValueStatus';
+const ERR_UNKNOWN_STATUS             = 'ErrUnknownStatus';
+const ERR_TERMINAL_STATUS            = 'ErrTerminalStatus';
+const ERR_FLOW_MISMATCH              = 'ErrFlowMismatch';
+const ERR_INVALID_TRANSITION         = 'ErrInvalidTransition';
+const ERR_MISSING_OP_ID              = 'ErrMissingOperatorID';
+const ERR_INVALID_SRC_SYS            = 'ErrInvalidSourceSystem';
+const ERR_FIRST_MILE_AFTER_LATER_MILE = 'ErrFirstMileAfterLaterMile';
 
 // ── Internal: spec compiler ───────────────────────────────────────────────────
 
@@ -88,11 +89,23 @@ function compileSpec(specText) {
   /** @type {boolean[]} terminals[id] */
   const terminals = new Array(SLOT_COUNT).fill(false);
 
+  /** @type {boolean[]} firstMile[id] — true for FIRST_MILE category statuses */
+  const firstMile = new Array(SLOT_COUNT).fill(false);
+
+  /** @type {boolean[]} postFirstMile[id] — true for MIDDLE_MILE or LAST_MILE category statuses */
+  const postFirstMile = new Array(SLOT_COUNT).fill(false);
+
   for (const s of doc.statuses) {
     const id = s.id + 1; // shift: YAML 0-indexed → JS 1-indexed
     codeToId.set(s.code, id);
     owners[id]    = s.owned_by || '';
     terminals[id] = s.terminal === true;
+    const cat = (s.category || '').toUpperCase();
+    if (cat === 'FIRST_MILE') {
+      firstMile[id] = true;
+    } else if (cat === 'MIDDLE_MILE' || cat === 'LAST_MILE') {
+      postFirstMile[id] = true;
+    }
   }
 
   // ── Step 2: adjacency table ───────────────────────────────────────────────
@@ -176,7 +189,7 @@ function compileSpec(specText) {
     initials.add(`${entry.code}:${entry.flow}`);
   }
 
-  return { adj, codeToId, owners, terminals, initials, specVersion };
+  return { adj, codeToId, owners, terminals, firstMile, postFirstMile, initials, specVersion };
 }
 
 // ── Engine class ──────────────────────────────────────────────────────────────
@@ -288,7 +301,7 @@ class Engine {
       return { valid: false, isOverride: false, isInterSystem: false, errorCode: ERR_ZERO_VALUE };
     }
 
-    const { adj, codeToId, owners, terminals } = this._spec;
+    const { adj, codeToId, owners, terminals, firstMile, postFirstMile } = this._spec;
 
     // ── Guard: unknown status codes ───────────────────────────────────────
     const currentId = codeToId.get(current);
@@ -303,6 +316,12 @@ class Engine {
     if (terminals[currentId]) {
       this.cntInvalid++;
       return { valid: false, isOverride: false, isInterSystem: false, errorCode: ERR_TERMINAL_STATUS };
+    }
+
+    // ── Guard: first-mile status cannot follow middle-mile or last-mile ───
+    if (postFirstMile[currentId] && firstMile[nextId]) {
+      this.cntInvalid++;
+      return { valid: false, isOverride: false, isInterSystem: false, errorCode: ERR_FIRST_MILE_AFTER_LATER_MILE };
     }
 
     // ── Look up edge in adjacency table ───────────────────────────────────

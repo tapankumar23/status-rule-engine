@@ -33,5 +33,8 @@ public enum ErrorCode {
     INVALID_SOURCE_SYSTEM,
 
     /** A {@code null} or zero-value status was supplied as input. */
-    ZERO_VALUE_STATUS
+    ZERO_VALUE_STATUS,
+
+    /** A first-mile status was proposed after a middle-mile or last-mile status. */
+    FIRST_MILE_AFTER_LATER_MILE
 }

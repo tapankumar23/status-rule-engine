@@ -132,6 +132,8 @@ func compileSpec(specYAML []byte) (*Engine, error) {
 	codeToStatus := make(map[string]status.Status, len(spec.Statuses))
 	var owners ownerArray
 	var terminals terminalArray
+	var firstMile [56]bool
+	var postFirstMile [56]bool
 
 	for _, s := range spec.Statuses {
 		if s.ID < 0 || s.ID > int(status.MaxID)-1 {
@@ -152,6 +154,13 @@ func compileSpec(specYAML []byte) (*Engine, error) {
 
 		if s.Terminal {
 			terminals[goID] = true
+		}
+
+		switch strings.ToUpper(s.Category) {
+		case "FIRST_MILE":
+			firstMile[goID] = true
+		case "MIDDLE_MILE", "LAST_MILE":
+			postFirstMile[goID] = true
 		}
 	}
 
@@ -254,11 +263,13 @@ func compileSpec(specYAML []byte) (*Engine, error) {
 	}
 
 	return &Engine{
-		adj:         adj,
-		owners:      owners,
-		terminals:   terminals,
-		initials:    initials,
-		specVersion: spec.SpecVersion,
+		adj:           adj,
+		owners:        owners,
+		terminals:     terminals,
+		firstMile:     firstMile,
+		postFirstMile: postFirstMile,
+		initials:      initials,
+		specVersion:   spec.SpecVersion,
 	}, nil
 }
 

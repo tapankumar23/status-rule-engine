@@ -58,14 +58,15 @@ class ErrorCode(str):
     was rejected.  These strings match the Go ``Err*`` constant names.
     """
 
-    NONE                  = 'ErrNone'
-    INVALID_TRANSITION    = 'ErrInvalidTransition'
-    TERMINAL_STATUS       = 'ErrTerminalStatus'
-    UNKNOWN_STATUS        = 'ErrUnknownStatus'
-    MISSING_OPERATOR_ID   = 'ErrMissingOperatorID'
-    FLOW_MISMATCH         = 'ErrFlowMismatch'
-    INVALID_SOURCE_SYSTEM = 'ErrInvalidSourceSystem'
-    ZERO_VALUE_STATUS     = 'ErrZeroValueStatus'
+    NONE                        = 'ErrNone'
+    INVALID_TRANSITION          = 'ErrInvalidTransition'
+    TERMINAL_STATUS             = 'ErrTerminalStatus'
+    UNKNOWN_STATUS              = 'ErrUnknownStatus'
+    MISSING_OPERATOR_ID         = 'ErrMissingOperatorID'
+    FLOW_MISMATCH               = 'ErrFlowMismatch'
+    INVALID_SOURCE_SYSTEM       = 'ErrInvalidSourceSystem'
+    ZERO_VALUE_STATUS           = 'ErrZeroValueStatus'
+    FIRST_MILE_AFTER_LATER_MILE = 'ErrFirstMileAfterLaterMile'
 
 
 # ---------------------------------------------------------------------------

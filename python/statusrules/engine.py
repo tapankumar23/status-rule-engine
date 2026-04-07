@@ -119,10 +119,17 @@ class Engine:
         # ── 2. owners[id] = owned_by string  (index 0 unused) ────────────────
         owners: List[str] = [''] * (MAX_ID + 1)
         terminals: List[bool] = [False] * (MAX_ID + 1)
+        first_mile: List[bool] = [False] * (MAX_ID + 1)
+        post_first_mile: List[bool] = [False] * (MAX_ID + 1)
         for entry in spec["statuses"]:
             pid = entry["id"] + 1
             owners[pid] = entry.get("owned_by", '')
             terminals[pid] = bool(entry.get("terminal", False))
+            cat = entry.get("category", "").upper()
+            if cat == "FIRST_MILE":
+                first_mile[pid] = True
+            elif cat in ("MIDDLE_MILE", "LAST_MILE"):
+                post_first_mile[pid] = True
 
         # ── 3. Adjacency array (8 192 unsigned-short slots) ───────────────────
         # Initialised to all-zeros; a zero entry means "no edge".
@@ -176,11 +183,13 @@ class Engine:
             initials.add((sid, fflow))
 
         # ── Store compiled data ───────────────────────────────────────────────
-        self._adj      = adj
-        self._owners   = owners
-        self._terminals = terminals
-        self._initials = initials
-        self._version  = spec.get("spec_version", "")
+        self._adj           = adj
+        self._owners        = owners
+        self._terminals     = terminals
+        self._first_mile    = first_mile
+        self._post_first_mile = post_first_mile
+        self._initials      = initials
+        self._version       = spec.get("spec_version", "")
 
         # Metrics counters (GIL-atomic for CPython; see module docstring).
         self._cnt_total       = 0
@@ -246,6 +255,15 @@ class Engine:
                 anomaly_reason=(
                     f"{ID_TO_CODE.get(current, current)} is a terminal status"
                 ),
+            )
+
+        # ── First-mile regression guard ───────────────────────────────────────
+        if self._post_first_mile[current] and self._first_mile[next_status]:
+            self._cnt_invalid += 1
+            return ValidationResult(
+                valid=False,
+                error_code=ErrorCode.FIRST_MILE_AFTER_LATER_MILE,
+                anomaly_reason="first-mile status cannot follow a middle-mile or last-mile status",
             )
 
         # ── Adjacency lookup ──────────────────────────────────────────────────

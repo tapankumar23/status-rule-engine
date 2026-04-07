@@ -58,8 +58,9 @@ const (
 	ErrUnknownStatus       ErrorCode = 3
 	ErrMissingOperatorID   ErrorCode = 4
 	ErrFlowMismatch        ErrorCode = 5
-	ErrInvalidSourceSystem ErrorCode = 6 // ctx.SourceSystem does not own nextStatus
-	ErrZeroValueStatus     ErrorCode = 7 // currentStatus or nextStatus is uninitialized
+	ErrInvalidSourceSystem     ErrorCode = 6 // ctx.SourceSystem does not own nextStatus
+	ErrZeroValueStatus         ErrorCode = 7 // currentStatus or nextStatus is uninitialized
+	ErrFirstMileAfterLaterMile ErrorCode = 8 // first-mile status cannot follow a middle-mile or last-mile status
 )
 
 // ValidationResult is the return type of all validation calls.

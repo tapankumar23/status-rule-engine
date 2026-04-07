@@ -81,6 +81,18 @@ public final class Engine {
     private final boolean[] terminals;
 
     /**
+     * Per-status flag: true if this status has category FIRST_MILE.
+     * Element [0] is unused.
+     */
+    private final boolean[] firstMile;
+
+    /**
+     * Per-status flag: true if this status has category MIDDLE_MILE or LAST_MILE.
+     * Element [0] is unused.
+     */
+    private final boolean[] postFirstMile;
+
+    /**
      * Valid first statuses for new shipments.
      * Each element is a two-element array {@code [statusId, flowBit]}.
      */
@@ -103,13 +115,17 @@ public final class Engine {
     private Engine(short[] adj,
                    SourceSystem[] owners,
                    boolean[] terminals,
+                   boolean[] firstMile,
+                   boolean[] postFirstMile,
                    List<int[]> initials,
                    String specVersion) {
-        this.adj         = adj;
-        this.owners      = owners;
-        this.terminals   = terminals;
-        this.initials    = Collections.unmodifiableList(initials);
-        this.specVersion = specVersion;
+        this.adj           = adj;
+        this.owners        = owners;
+        this.terminals     = terminals;
+        this.firstMile     = firstMile;
+        this.postFirstMile = postFirstMile;
+        this.initials      = Collections.unmodifiableList(initials);
+        this.specVersion   = specVersion;
     }
 
     // ── Static factories ───────────────────────────────────────────────────────
@@ -191,6 +207,14 @@ public final class Engine {
             return ValidationResult.error(
                     ErrorCode.TERMINAL_STATUS,
                     current.code + " is a terminal status; no further transitions are allowed");
+        }
+
+        // 2b. First-mile regression check
+        if (postFirstMile[current.id] && firstMile[next.id]) {
+            invalidTransitions.incrementAndGet();
+            return ValidationResult.error(
+                    ErrorCode.FIRST_MILE_AFTER_LATER_MILE,
+                    "first-mile status " + next.code + " cannot follow middle-mile or last-mile status " + current.code);
         }
 
         // 3. Adjacency lookup
@@ -347,8 +371,10 @@ public final class Engine {
         // code→id map (YAML ids are 0-based; we store them as id+1)
         Map<String, Integer> codeToId = new HashMap<>();
         // Indexed by Java id (1-based)
-        SourceSystem[] owners    = new SourceSystem[Status.MAX_ID + 1];
-        boolean[]      terminals = new boolean[Status.MAX_ID + 1];
+        SourceSystem[] owners       = new SourceSystem[Status.MAX_ID + 1];
+        boolean[]      terminals    = new boolean[Status.MAX_ID + 1];
+        boolean[]      firstMile    = new boolean[Status.MAX_ID + 1];
+        boolean[]      postFirstMile = new boolean[Status.MAX_ID + 1];
 
         List<Map<String, Object>> statuses =
                 (List<Map<String, Object>>) root.get("statuses");
@@ -365,6 +391,13 @@ public final class Engine {
 
             Object terminalObj = entry.get("terminal");
             terminals[javaId]  = Boolean.TRUE.equals(terminalObj);
+
+            String category = entry.containsKey("category") ? ((String) entry.get("category")).toUpperCase() : "";
+            if ("FIRST_MILE".equals(category)) {
+                firstMile[javaId] = true;
+            } else if ("MIDDLE_MILE".equals(category) || "LAST_MILE".equals(category)) {
+                postFirstMile[javaId] = true;
+            }
         }
 
         // ── 3. Wildcard targets ────────────────────────────────────────────────
@@ -470,7 +503,7 @@ public final class Engine {
             }
         }
 
-        return new Engine(adj, owners, terminals, initials, specVersion);
+        return new Engine(adj, owners, terminals, firstMile, postFirstMile, initials, specVersion);
     }
 
     // ── Key packing ────────────────────────────────────────────────────────────

@@ -154,12 +154,12 @@
 
 <!-- ════════════════════ TAB NAV ════════════════════ -->
 <nav class="tabs-nav">
-  <button class="tab-btn active" data-tab="tab-ops"   onclick="switchTab('tab-ops')">   🎯 Operations</button>
-  <button class="tab-btn"        data-tab="tab-arch"  onclick="switchTab('tab-arch')">  🏗 Architecture</button>
-  <button class="tab-btn"        data-tab="tab-lld"   onclick="switchTab('tab-lld')">   🔬 Low-Level Design</button>
-  <button class="tab-btn"        data-tab="tab-ci"    onclick="switchTab('tab-ci')">    🧪 CI Pipeline</button>
-  <button class="tab-btn"        data-tab="tab-cd"    onclick="switchTab('tab-cd')">    🚀 CD Pipeline</button>
-  <button class="tab-btn"        data-tab="tab-statuses" onclick="switchTab('tab-statuses')">📦 Status Registry</button>
+  <button class="tab-btn active" data-tab="tab-ops"      onclick="switchTab('tab-ops')">      🎯 Operations</button>
+  <button class="tab-btn"        data-tab="tab-statuses" onclick="switchTab('tab-statuses')"> 📦 Status Registry</button>
+  <button class="tab-btn"        data-tab="tab-arch"     onclick="switchTab('tab-arch')">     🏗 Architecture</button>
+  <button class="tab-btn"        data-tab="tab-lld"      onclick="switchTab('tab-lld')">      🔬 Low-Level Design</button>
+  <button class="tab-btn"        data-tab="tab-ci"       onclick="switchTab('tab-ci')">       🧪 CI Pipeline</button>
+  <button class="tab-btn"        data-tab="tab-cd"       onclick="switchTab('tab-cd')">       🚀 CD Pipeline</button>
 </nav>
 
 <!-- ══════════════════════════════════════════════════
@@ -301,13 +301,13 @@
           <td>Source of truth</td>
           <td><span class="chk">✓</span> Yes (runtime)</td>
           <td>Harder to sync</td>
-          <td class="hl"><span class="chk">✓</span> Yes (versioned spec at build time)</td>
+          <td class="hl"><span class="chk">✓</span> Yes (versioned spec loaded at startup)</td>
         </tr>
         <tr>
           <td>Spec correctness</td>
           <td>Runtime crash on bad spec</td>
           <td>Runtime crash</td>
-          <td class="hl"><span class="chk">✓</span> Invalid spec = build failure</td>
+          <td class="hl"><span class="chk">✓</span> Invalid spec = startup panic (caught before first request)</td>
         </tr>
         <tr>
           <td>Rule update cost</td>
@@ -323,7 +323,7 @@
         </tr>
       </tbody>
     </table>
-    <p style="font-size:12px; color:#64748b; margin-top:12px;">Rule update overhead is acceptable: The rule engine's status rules change a few times per quarter. Safety guarantee (invalid spec = build failure) outweighs operational convenience.</p>
+    <p style="font-size:12px; color:#64748b; margin-top:12px;">Rule update overhead is acceptable: The rule engine's status rules change a few times per quarter. Safety guarantee (invalid spec = startup panic before first request) outweighs operational convenience.</p>
   </div>
 
   <!-- System Topology Diagram -->
@@ -347,10 +347,10 @@ flowchart TB
       TE["Rule Engine\n(embedded)"]
     end
 
-    YAML -.->|"bundled at build time\n(go:embed / JAR resource)"| BE
-    YAML -.->|"bundled at build time"| HE
-    YAML -.->|"bundled at build time"| DE
-    YAML -.->|"bundled at build time"| TE
+    YAML -.->|"loaded at startup\n(file read from spec/)"| BE
+    YAML -.->|"loaded at startup"| HE
+    YAML -.->|"loaded at startup"| DE
+    YAML -.->|"loaded at startup"| TE
 
     BOOKING -->|"emit events"| EB["📨 Event Bus\n(Kafka)"]
     HUB     -->|"emit events"| EB
@@ -469,7 +469,7 @@ flowchart LR
   <div class="card">
     <div class="card-title"><span class="icon">📐</span> Public API Surface</div>
     <pre class="codeblock"><span class="cm">// ── Engine initialization (called once at startup) ──────────────────────────</span>
-<span class="kw">func</span> <span class="fn">NewEngine</span>() *<span class="tp">Engine</span>                                    <span class="cm">// panics if bundled spec is invalid (build-time invariant)</span>
+<span class="kw">func</span> <span class="fn">NewEngine</span>() *<span class="tp">Engine</span>                                    <span class="cm">// panics if spec/rules.yaml is missing or invalid (startup error)</span>
 <span class="kw">func</span> <span class="fn">NewEngineFromSpec</span>(specYAML []<span class="tp">byte</span>) (*<span class="tp">Engine</span>, <span class="tp">error</span>)      <span class="cm">// for tests and canary validation only</span>
 
 <span class="cm">// ── Hot path ────────────────────────────────────────────────────────────────</span>
@@ -748,7 +748,7 @@ flowchart TD
 
     S1["Stage 1 — Spec Validation\nJSON Schema lint on rules.yaml\nChecks: duplicate IDs, unknown owned_by,\ntransition from terminal, missing fields\n~2s"]
 
-    S2["Stage 2 — Build\ngo build ./...\nInvalid bundled spec = compile panic\nTypos in status constants = compile error\n~5s"]
+    S2["Stage 2 — Build\ngo build ./...\nInvalid spec = startup panic on first test\nTypos in status constants = compile error\n~5s"]
 
     S3["Stage 3 — Contract Tests\nPositive: every spec edge returns Valid=true\nNegative: every invalid edge returns Valid=false\nGenerated from spec YAML automatically\n~10s"]
 
@@ -799,18 +799,18 @@ flowchart TD
     <div class="card">
       <div class="card-title"><span class="icon">🏗</span> Stage 2 — Build Gate</div>
       <div class="concept green">
-        <div class="concept-ttl">Invalid spec = build failure (not runtime crash)</div>
-        <div class="concept-body"><code>NewEngine()</code> calls <code>panic()</code> if the bundled spec fails to compile. This means any commit that bundles a broken spec will fail <code>go build</code> immediately — before a single test runs. Engineers see the error at build time, not in production.</div>
+        <div class="concept-ttl">Invalid spec = startup panic (before first request)</div>
+        <div class="concept-body"><code>NewEngine()</code> calls <code>panic()</code> if <code>spec/rules.yaml</code> is missing or fails to parse. This means a bad spec is caught when the process starts — before it handles any traffic. The test suite calls <code>NewEngine()</code> at package init, so it fails on the first <code>go test</code> run.</div>
       </div>
       <div class="concept">
         <div class="concept-ttl">Typos are compile errors</div>
-        <div class="concept-body">Generated status constants (<code>status.HubOutscan</code>, <code>status.Delivered</code>) mean that source systems referencing a renamed or deleted status will fail to compile. No stringly-typed status codes escape into the codebase.</div>
+        <div class="concept-body">Typed status constants (<code>status.HubOutscan</code>, <code>status.Delivered</code>) mean that source systems referencing a renamed or deleted status will fail to compile. No stringly-typed status codes escape into the codebase.</div>
       </div>
-      <pre class="codeblock"><span class="fn">build</span>:
-  <span class="kw">run</span>: <span class="str">go build ./...</span>
-  <span class="cm"># NewEngine() panics on bad bundled spec</span>
-  <span class="cm"># → go test -run=^$ ./... triggers init</span>
-  <span class="cm"># → caught before any test runs</span></pre>
+      <pre class="codeblock"><span class="fn">test</span>:
+  <span class="kw">run</span>: <span class="str">go test ./...</span>
+  <span class="cm"># var engine = NewEngine() at package level</span>
+  <span class="cm"># → panics immediately if spec/rules.yaml is invalid</span>
+  <span class="cm"># → caught before any test function runs</span></pre>
     </div>
 
     <div class="card">
@@ -1102,15 +1102,15 @@ sequenceDiagram
       <div class="card-title"><span class="icon">⏪</span> Rollback Procedure</div>
       <div class="concept red">
         <div class="concept-ttl">Library rollback (minor/patch)</div>
-        <div class="concept-body">Pin the previous library version in <code>go.mod</code> (or <code>pom.xml</code> / <code>package.json</code>), merge the revert PR, rolling restart. The bundled spec reverts with the library — no config store to revert separately. Typical rollback time: same as a normal deploy.</div>
+        <div class="concept-body">Pin the previous library version in <code>go.mod</code> (or <code>pom.xml</code> / <code>package.json</code>), merge the revert PR, rolling restart. Rolling back the commit reverts both the library and <code>spec/rules.yaml</code> together — no config store to revert separately. Typical rollback time: same as a normal deploy.</div>
       </div>
       <div class="concept amber">
         <div class="concept-ttl">Major version rollback (breaking change)</div>
         <div class="concept-body">All four source systems must roll back in the same window. Because the old spec rejects transitions the new spec added, there is no safe partial rollback. Coordinate the revert deploy across all systems before any traffic is shifted back.</div>
       </div>
       <div class="concept">
-        <div class="concept-ttl">Rollback does NOT require a spec repo revert</div>
-        <div class="concept-body">The spec and the library are separate versioned artifacts. Rolling back the library (redeploying v1.0.0) automatically rolls back the spec — the library bundles the spec at build time. The spec repo history is preserved for audit.</div>
+        <div class="concept-ttl">Rollback does NOT require a separate spec revert</div>
+        <div class="concept-body">All four language packages live in the same monorepo as <code>spec/rules.yaml</code>. Rolling back to a prior commit reverts the spec and all language implementations together atomically. No separate spec repository to coordinate.</div>
       </div>
     </div>
 
@@ -1524,27 +1524,43 @@ DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, M
     ];
 
     // ── Summary stat cards ────────────────────────────────────────────────────
-    const counts = {};
-    STATUSES_DATA.forEach(s => { counts[s.category] = (counts[s.category] || 0) + 1; });
-    const terminalCount  = STATUSES_DATA.filter(s => s.terminal === 'yes').length;
-    const wildcardCount  = WILDCARDS.length;
-    const overrideCount  = STATUSES_DATA.filter(s => s.category === 'OVERRIDE').length;
-
+    const terminalCount = STATUSES_DATA.filter(s => s.terminal === 'yes').length;
     document.getElementById('statuses-summary-row').innerHTML = [
-      { val: STATUSES_DATA.length,  lbl: 'Total Statuses' },
-      { val: terminalCount,         lbl: 'Terminal States' },
-      { val: wildcardCount,         lbl: 'Wildcard Targets' },
-      { val: overrideCount,         lbl: 'FORCE_* Overrides' },
+      { val: STATUSES_DATA.length, lbl: 'Total Statuses' },
+      { val: terminalCount,        lbl: 'Terminal States' },
+      { val: WILDCARDS.length,     lbl: 'Wildcard Targets' },
+      { val: STATUSES_DATA.filter(s => s.category === 'OVERRIDE').length, lbl: 'FORCE_* Overrides' },
     ].map(s =>
       `<div class="stat"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`
     ).join('');
 
-    // ── Helper: badge class from status data ─────────────────────────────────
-    function rowBadgeClass(s) {
-      if (s.terminal === 'yes')       return 'b-terminal';
-      if (s.category === 'OVERRIDE')  return 'b-override';
-      if (s.category === 'EXCEPTION') return 'b-except';
-      return { Booking: 'b-booking', Hub: 'b-hub', Delivery: 'b-delivery', '3PL': 'b-3pl' }[s.system] || 'b-hub';
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function badgeClass(code) {
+      if (TERMINALS.has(code))      return 'b-terminal';
+      if (FORCE.has(code))          return 'b-override';
+      if (WILDCARDS.includes(code)) return 'b-except';
+      return { Booking:'b-booking', Hub:'b-hub', Delivery:'b-delivery', '3PL':'b-3pl' }[OWNERS[code]] || 'b-hub';
+    }
+
+    function buildNextCell(s) {
+      if (s.terminal === 'yes') {
+        return `<span style="color:#991b1b;font-size:12px;font-weight:600;">⛔ Terminal — no outgoing transitions</span>`;
+      }
+      const byFlow = TRANSITIONS[s.code] || {};
+      const parts  = [];
+      ['FORWARD','REVERSE'].forEach(fl => {
+        const tos = byFlow[fl] || [];
+        if (!tos.length) return;
+        const flowPill = `<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:${fl==='FORWARD'?'#dbeafe':'#ede9fe'};color:${fl==='FORWARD'?'#1d4ed8':'#5b21b6'};">${fl}</span>`;
+        const badges   = tos.map(t =>
+          `<span class="badge ${badgeClass(t)}" style="margin:2px 3px 2px 0;">${FORCE.has(t)?'⚡ ':''}${t}</span>`
+        ).join('');
+        parts.push(`<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;flex-wrap:wrap;">${flowPill}<span style="display:flex;flex-wrap:wrap;">${badges}</span></div>`);
+      });
+      if (!parts.length) {
+        return `<span style="color:#64748b;font-size:12px;font-style:italic;">No explicit transitions — exception wildcards only</span>`;
+      }
+      return parts.join('');
     }
 
     // ── One card per group ────────────────────────────────────────────────────
@@ -1552,21 +1568,27 @@ DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, M
       const members = STATUSES_DATA.filter(s => s.category === g.key);
       if (!members.length) return '';
 
+      // Wildcard note inside exception/override groups where no next-status applies
+      const wildcardNote = (g.key === 'EXCEPTION')
+        ? `<div style="margin-bottom:12px;padding:10px 14px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;font-size:12px;color:#0c4a6e;">
+             <strong>These statuses are themselves wildcard targets</strong> — reachable from any non-terminal status.
+             Their own outgoing transitions follow below.
+           </div>`
+        : '';
+
       const rows = members.map(s => {
-        const terminalCell = s.terminal === 'yes'
-          ? '<span style="color:#dc2626;font-weight:700;">yes ⛔</span>'
-          : '<span style="color:#64748b;">no</span>';
         const flowParts = s.flows.split(',').map(f => f.trim()).map(f =>
           `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:${f==='FORWARD'?'#dbeafe':'#ede9fe'};color:${f==='FORWARD'?'#1d4ed8':'#5b21b6'};">${f}</span>`
         ).join(' ');
-        return `<tr>
-          <td style="padding:8px 12px;font-weight:700;font-size:12px;font-family:monospace;white-space:nowrap;">
-            <span class="badge ${rowBadgeClass(s)}">${s.code}</span>
+
+        return `<tr onmouseenter="this.style.background='#fafafa'" onmouseleave="this.style.background=''">
+          <td style="padding:9px 14px;white-space:nowrap;vertical-align:top;">
+            <span class="badge ${badgeClass(s.code)}">${FORCE.has(s.code)?'⚡ ':''}${s.code}</span>
+            ${s.terminal==='yes' ? '<span style="color:#dc2626;font-size:10px;font-weight:700;margin-left:4px;">⛔</span>' : ''}
           </td>
-          <td style="padding:8px 12px;font-size:12px;color:#64748b;text-align:center;">${s.id}</td>
-          <td style="padding:8px 12px;font-size:12px;color:#475569;">${s.system}</td>
-          <td style="padding:8px 12px;">${flowParts}</td>
-          <td style="padding:8px 12px;font-size:12px;">${terminalCell}</td>
+          <td style="padding:9px 14px;font-size:12px;color:#64748b;white-space:nowrap;vertical-align:top;">${s.system}</td>
+          <td style="padding:9px 14px;vertical-align:top;">${flowParts}</td>
+          <td style="padding:9px 14px;vertical-align:top;">${buildNextCell(s)}</td>
         </tr>`;
       }).join('');
 
@@ -1577,18 +1599,18 @@ DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, M
           <span style="background:${g.accent};color:white;font-size:11px;padding:2px 9px;border-radius:12px;font-weight:700;">${members.length}</span>
           <span style="font-size:12px;font-weight:400;color:#64748b;margin-left:4px;">— ${g.sub}</span>
         </div>
+        ${wildcardNote}
         <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead>
               <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Status Code</th>
-                <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">ID</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">System</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Flows</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Terminal</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Status Code</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">System</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Flows</th>
+                <th style="padding:8px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Valid Next Statuses</th>
               </tr>
             </thead>
-            <tbody style="divide-y:#f1f5f9;">${rows}</tbody>
+            <tbody>${rows}</tbody>
           </table>
         </div>
       </div>`;
@@ -1808,12 +1830,13 @@ DAMAGED, MIS_ROUTED, REROUTED, EXCESS_INSCAN, PINCODE_AUDITED, WEIGHT_AUDITED, M
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes pulsePill {
-    0%, 100% { opacity: 1;    box-shadow: 0 4px 20px rgba(79,70,229,0.25); }
-    50%       { opacity: 0.45; box-shadow: 0 2px 8px  rgba(79,70,229,0.1);  }
+  @keyframes jumpPill {
+    0%, 60%, 100% { transform: translateY(0);    box-shadow: 0 4px 20px rgba(79,70,229,0.25); }
+    30%           { transform: translateY(-10px); box-shadow: 0 14px 28px rgba(79,70,229,0.35); }
+    80%           { transform: translateY(-4px);  box-shadow: 0 8px 22px rgba(79,70,229,0.3);  }
   }
-  #pipeline-reset-bar { animation: floatIn 0.2s ease, pulsePill 1.6s ease-in-out 0.2s infinite; }
-  #pipeline-reset-bar:hover { animation: none; opacity: 1; }
+  #pipeline-reset-bar { animation: floatIn 0.2s ease, jumpPill 1.4s cubic-bezier(0.36,0.07,0.19,0.97) 0.4s infinite; }
+  #pipeline-reset-bar:hover { animation: none; transform: translateY(-2px); opacity: 1; }
 </style>
 
 </body>

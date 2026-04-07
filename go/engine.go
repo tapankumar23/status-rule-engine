@@ -27,23 +27,26 @@ import (
 // Pre-defined AnomalyReason strings. String literals live in the data segment —
 // assigning them to the result struct never allocates on the heap.
 const (
-	reasonZeroValue       = "zero-value status: use ValidateInitial for new shipments"
-	reasonUnknownStatus   = "unknown status code"
-	reasonTerminal        = "transition from a terminal status is never valid"
-	reasonInvalidFlow     = "flow must be FlowForward or FlowReverse"
-	reasonNotInSpec       = "transition not defined in rule spec"
-	reasonMissingOperator = "operator_id required for FORCE_* override transition"
-	reasonWrongOwner      = "ctx.SourceSystem does not own the next status"
+	reasonZeroValue            = "zero-value status: use ValidateInitial for new shipments"
+	reasonUnknownStatus        = "unknown status code"
+	reasonTerminal             = "transition from a terminal status is never valid"
+	reasonInvalidFlow          = "flow must be FlowForward or FlowReverse"
+	reasonNotInSpec            = "transition not defined in rule spec"
+	reasonMissingOperator      = "operator_id required for FORCE_* override transition"
+	reasonWrongOwner           = "ctx.SourceSystem does not own the next status"
+	reasonFirstMileRegressed   = "first-mile status cannot follow a middle-mile or last-mile status"
 )
 
 // Engine is the compiled rule engine. It is immutable after construction and
 // safe for concurrent use by any number of goroutines without locking.
 type Engine struct {
-	adj         adjacencyMap
-	owners      ownerArray
-	terminals   terminalArray
-	initials    []initialEntry
-	specVersion string
+	adj          adjacencyMap
+	owners       ownerArray
+	terminals    terminalArray
+	firstMile    [56]bool // true for FIRST_MILE category statuses
+	postFirstMile [56]bool // true for MIDDLE_MILE or LAST_MILE category statuses
+	initials     []initialEntry
+	specVersion  string
 
 	// Atomic counters — LOCK XADD, no allocation, no contention.
 	// Read via Snapshot() from a background goroutine; never on the hot path.
@@ -141,6 +144,15 @@ func (e *Engine) Validate(
 		return ValidationResult{
 			ErrorCode:     ErrTerminalStatus,
 			AnomalyReason: reasonTerminal,
+		}
+	}
+
+	// ── Guard: first-mile status cannot follow middle-mile or last-mile ───────
+	if e.postFirstMile[currentStatus] && e.firstMile[nextStatus] {
+		e.cntInvalid.Add(1)
+		return ValidationResult{
+			ErrorCode:     ErrFirstMileAfterLaterMile,
+			AnomalyReason: reasonFirstMileRegressed,
 		}
 	}
 

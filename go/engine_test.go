@@ -166,6 +166,14 @@ var invalidTransitions = []transitionCase{
 	// FORCE_* without operator_id
 	{"HUB_IN_SCANNED→FORCE_HUB_OUTSCAN_no_op", status.HubInScanned, status.ForceHubOutscan, statusrules.FlowForward,
 		statusrules.TransitionContext{SourceSystem: statusrules.SystemHub, OperatorID: ""}},
+
+	// First-mile status after middle-mile or last-mile
+	{"HUB_IN_SCANNED→INSCANNED_first_mile_regress", status.HubInScanned, status.Inscanned, statusrules.FlowForward,
+		statusrules.TransitionContext{SourceSystem: statusrules.SystemHub}},
+	{"OUT_FOR_DELIVERY→READY_FOR_PICKUP_first_mile_regress", status.OutForDelivery, status.ReadyForPickup, statusrules.FlowForward,
+		statusrules.TransitionContext{SourceSystem: statusrules.SystemHub}},
+	{"HUB_OUTSCAN→INSCANNED_first_mile_regress", status.HubOutscan, status.Inscanned, statusrules.FlowForward,
+		statusrules.TransitionContext{SourceSystem: statusrules.SystemHub}},
 }
 
 func TestValidate_InvalidTransitions(t *testing.T) {
@@ -293,6 +301,34 @@ func TestProperty_ForceEdgesRequireOperatorID(t *testing.T) {
 		}
 		if result.ErrorCode != statusrules.ErrMissingOperatorID {
 			t.Errorf("expected ErrMissingOperatorID for %v→%v, got %d", e.from, e.to, result.ErrorCode)
+		}
+	}
+}
+
+// First-mile statuses must be rejected after middle-mile or last-mile statuses.
+func TestProperty_FirstMileCannotFollowLaterMile(t *testing.T) {
+	cases := []struct {
+		from status.Status
+		to   status.Status
+	}{
+		{status.HubInScanned, status.Inscanned},
+		{status.HubInScanned, status.ReadyForPickup},
+		{status.Bagged, status.Inscanned},
+		{status.InscannedAtTransit, status.ReadyForPickup},
+		{status.OutForDelivery, status.Inscanned},
+		{status.OutForDelivery, status.ReadyForPickup},
+		{status.Attempted, status.Inscanned},
+		{status.Undelivered, status.ReadyForPickup},
+	}
+	for _, tc := range cases {
+		result := engine.Validate(tc.from, tc.to, statusrules.FlowForward, statusrules.TransitionContext{
+			SourceSystem: statusrules.SystemHub,
+		})
+		if result.Valid {
+			t.Errorf("first-mile %v should not follow later-mile %v, but got Valid=true", tc.to, tc.from)
+		}
+		if result.ErrorCode != statusrules.ErrFirstMileAfterLaterMile {
+			t.Errorf("expected ErrFirstMileAfterLaterMile for %v→%v, got %d", tc.from, tc.to, result.ErrorCode)
 		}
 	}
 }

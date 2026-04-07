@@ -292,3 +292,29 @@ def test_no_inter_system_flag_same_system(engine: Engine) -> None:
     )
     assert result.valid
     assert not result.is_inter_system
+
+
+# ---------------------------------------------------------------------------
+# Test 13 — first-mile status cannot follow middle-mile or last-mile
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("current,next_s", [
+    (Status.HUB_IN_SCANNED, Status.INSCANNED),
+    (Status.HUB_IN_SCANNED, Status.READY_FOR_PICKUP),
+    (Status.BAGGED, Status.INSCANNED),
+    (Status.OUT_FOR_DELIVERY, Status.INSCANNED),
+    (Status.OUT_FOR_DELIVERY, Status.READY_FOR_PICKUP),
+    (Status.ATTEMPTED, Status.INSCANNED),
+])
+def test_first_mile_cannot_follow_later_mile(engine: Engine, current: int, next_s: int) -> None:
+    """A FIRST_MILE status must be rejected after any MIDDLE_MILE or LAST_MILE status."""
+    result = engine.validate(
+        current=current,
+        next_status=next_s,
+        flow=Flow.FORWARD,
+        ctx=_ctx(source_system=SourceSystem.HUB),
+    )
+    assert not result.valid
+    assert result.error_code == ErrorCode.FIRST_MILE_AFTER_LATER_MILE, (
+        f"Expected ErrFirstMileAfterLaterMile, got {result.error_code}"
+    )
